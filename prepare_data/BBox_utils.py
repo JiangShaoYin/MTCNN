@@ -147,8 +147,8 @@ class BBox(object):
         return np.asarray([x, y])
     #absolute position(image (left,top))
     def reproject(self, point):
-        x = self.x + self.w*point[0]
-        y = self.y + self.h*point[1]
+        x = self.x + self.w * point[0]
+        y = self.y + self.h * point[1]
         return np.asarray([x, y])
     #landmark: 5*2
     def reprojectLandmark(self, landmark):
