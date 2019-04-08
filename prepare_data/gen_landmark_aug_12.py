@@ -18,20 +18,6 @@ if not exists(dstdir): os.mkdir(dstdir)
 assert(exists(dstdir) and exists(OUTPUT))
 
 def IoU(box, boxes):
-    """Compute IoU between detect box and gt boxes
-
-    Parameters:
-    ----------
-    box: numpy array , shape (5, ): x1, y1, x2, y2, score
-        input box
-    boxes: numpy array, shape (n, 4): x1, y1, x2, y2
-        input ground truth boxes
-
-    Returns:
-    -------
-    ovr: numpy.array, shape (n, )
-        IoU
-    """
     box_area = (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
     area = (boxes[:, 2] - boxes[:, 0] + 1) * (boxes[:, 3] - boxes[:, 1] + 1)
     xx1 = np.maximum(box[0], boxes[:, 0])
@@ -58,7 +44,7 @@ def GenerateData(ftxt, output,net,argument=False):
     f = open(join(OUTPUT,"landmark_%s_aug.txt" %(size)),'w')
     #dstdir = "train_landmark_few"
    
-    data = getDataFromTxt(ftxt)
+    data = getDataFromTxt(ftxt)  # ftxt == trainImageList.txt
     idx = 0
     #image_path bbox landmark(5*2)
     for (imgPath, bbox, landmarkGt) in data:
@@ -68,12 +54,12 @@ def GenerateData(ftxt, output,net,argument=False):
         img = cv2.imread(imgPath)
         assert(img is not None)
         img_h,img_w,img_c = img.shape
-        gt_box = np.array([bbox.left,bbox.top,bbox.right,bbox.bottom])
-        f_face = img[bbox.top:bbox.bottom+1,bbox.left:bbox.right+1]
-        f_face = cv2.resize(f_face,(size,size))
+        gt_box = np.array([bbox.left,bbox.top,bbox.right,bbox.bottom])  # 标签中人脸的区域
+        f_face = img[bbox.top:bbox.bottom+1,bbox.left:bbox.right+1]  # 拿到标签中人脸的矩形框
+        f_face = cv2.resize(f_face, (size,size))   # 将人脸resize成12 * 12大小
         landmark = np.zeros((5, 2))
         #normalize
-        for index, one in enumerate(landmarkGt):
+        for index, one in enumerate(landmarkGt):  # 遍历人脸5个特征点的label 
             rv = ((one[0]-gt_box[0])/(gt_box[2]-gt_box[0]), (one[1]-gt_box[1])/(gt_box[3]-gt_box[1]))
             landmark[index] = rv
         
@@ -173,7 +159,7 @@ def GenerateData(ftxt, output,net,argument=False):
                 f.write(join(dstdir,"%d.jpg" %(image_id))+" -2 "+" ".join(landmarks)+"\n")
                 image_id = image_id + 1
             
-    #print F_imgs.shape
+    # print F_imgs.shape
     #print F_landmarks.shape
     #F_imgs = processImage(F_imgs)
     #shuffle_in_unison_scary(F_imgs, F_landmarks)
