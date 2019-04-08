@@ -30,6 +30,7 @@ def IoU(box, boxes):
     inter = w * h
     ovr = inter*1.0 / (box_area + area - inter)
     return ovr
+
 def GenerateData(ftxt, output,net,argument=False):
     if net == "PNet":
         size = 12
