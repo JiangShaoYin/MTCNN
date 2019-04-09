@@ -24,15 +24,19 @@ def cls_ohem(cls_prob, label):  # online hard example mining
     zeros = tf.zeros_like(label)  # 产生与label同维度的全0矩阵zeros
     #label=-1 --> label=0net_factory
 
-    label_filter_invalid = tf.where(tf.less(label, 0), zeros, label)  # 将label中 < 0 的数，换成0，> 0 的数，保持不变
-
-    #tf.where(input, a,b)，其中a，b均为尺寸一致的tensor，作用是将a中对应input中true的位置的元素值不变，其余元素进行替换，替换成b中对应位置的元素值
+    # 将label中 < 0 的数，换成0，> 0 的数，保持不变
+    label_filter_invalid = tf.where(tf.less(label, 0), zeros, label)
+    # cls_prob的shape是(4608, 2)，返回tensor元素的个数4608*2=9216
     num_cls_prob = tf.size(cls_prob)
-    cls_prob_reshape = tf.reshape(cls_prob, [num_cls_prob,-1])  # 将矩阵转置成多行1列的数据
-    label_int = tf.cast(label_filter_invalid,tf.int32)  #
-    num_row = tf.to_int32(cls_prob.get_shape()[0])  # 获取行数
-    row = tf.range(num_row) * 2  # 产生[0,1.....2303] * 2 的张量
-    indices_ = row + label_int  # 同维度的每个元素加上一个对应的label_int值
+    # 将cls_prob矩阵转置成4608*2=9216行，1列的数据
+    cls_prob_reshape = tf.reshape(cls_prob, [num_cls_prob, -1])
+    label_int = tf.cast(label_filter_invalid, tf.int32)          # 标签的整数转换
+
+    num_row = tf.to_int32(cls_prob.get_shape()[0])  #cls_prob的shape是(4608, 2)， 获取0维的大小即4608
+
+    row = tf.range(num_row) * 2  # 产生[0,2.....9612] 的4806维张量
+    indices_ = row + label_int   # 同维度的每个元素加上一个对应的label_int值，如果label是0就取第1位上的数据，如果label是1就取第2位上的数据。对应onehot编码
+    # 计算预测值
     label_prob = tf.squeeze(tf.gather(cls_prob_reshape, indices_))   # cls_prob_reshape == (9216, 1), indices = 4608 一维数组
                                                                      # label_prob经过squeeze成为了1维数组
     loss = -tf.log(label_prob+1e-10)  #
@@ -42,10 +46,10 @@ def cls_ohem(cls_prob, label):  # online hard example mining
     valid_inds = tf.where(label < zeros, zeros, ones)   # valid_inds = label的二值化处理，<0 置为0，>0 置为1
 
     num_valid = tf.reduce_sum(valid_inds)  # 元素个数
-    keep_num = tf.cast(num_valid * num_keep_radio,dtype=tf.int32)  # 只保留70%的数据
+    keep_num = tf.cast(num_valid * num_keep_radio,dtype=tf.int32)  # 只保留最大的前70%的数据
     #set 0 to invalid sample
-    loss = loss * valid_inds  # loss = -tf.log(label_prob+1e-10)，逐位相乘，保持维度不变
-    loss,_ = tf.nn.top_k(loss, k=keep_num)  # 取出最大的前k个loss
+    loss = loss * valid_inds  # loss = -tf.log(label_prob+1e-10)，逐位相乘，保持维度不变，loss值记录计算结果， 与label结果的相似度，值越大，判断结果与label距离越远
+    loss, _ = tf.nn.top_k(loss, k=keep_num)  # 取出最大的前k个loss
     return tf.reduce_mean(loss)
 
 
@@ -82,7 +86,7 @@ def bbox_ohem_orginal(bbox_pred,bbox_target,label):
 def bbox_ohem(bbox_pred,bbox_target,label):
     zeros_index = tf.zeros_like(label, dtype=tf.float32)
     ones_index = tf.ones_like(label,dtype=tf.float32)
-    valid_inds = tf.where(tf.equal(tf.abs(label), 1),ones_index,zeros_index)
+    valid_inds = tf.where(tf.equal(tf.abs(label), 1), ones_index, zeros_index)
     #(batch,)
     square_error = tf.square(bbox_pred-bbox_target)
     square_error = tf.reduce_sum(square_error,axis=1)
@@ -141,14 +145,14 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
         net4 = slim.conv2d(net3,num_outputs=32,kernel_size=[3,3],stride=1,scope='conv3')     # 第3层卷积网络
             #    print(net.get_shape())
 
-                                                                                            # 第4-1层卷积网络
+        #  conv4_1 = 4608 * 1 * 1 * 2                                                                                   # 第4-1层卷积网络
         conv4_1 = slim.conv2d(net4, num_outputs=2, kernel_size=[1, 1], stride=1, scope='conv4_1', activation_fn = tf.nn.softmax)
- #       with tf.Session():
-#          print(conv4_1.eval())
 
         bbox_pred = slim.conv2d(net4, num_outputs=4, kernel_size=[1, 1], stride=1, scope='conv4_2', activation_fn=None)
             #print(bbox_pred.get_shape())
         # batch*H*W*10
+        with tf.Session():
+            print(conv4_1.eval())
         landmark_pred = slim.conv2d(net4,num_outputs=10, kernel_size=[1, 1], stride=1,scope='conv4_3', activation_fn=None)
 
         if training:

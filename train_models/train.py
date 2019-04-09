@@ -140,11 +140,9 @@ def train(net_factory, prefix, end_epoch, base_dir, display=200, base_lr=0.01):
             
             if (step+1) % display == 0:
                 #acc = accuracy(cls_pred, labels_batch)
-            #    cls_loss, bbox_loss,landmark_loss,L2_loss,lr,acc = sess.run([cls_loss_op, bbox_loss_op,landmark_loss_op,L2_loss_op,lr_op,accuracy_op],
-            #                                                 feed_dict={input_image: image_batch_array, label: label_batch_array, bbox_target: bbox_batch_array, landmark_target: landmark_batch_array,global_:step})
+                cls_loss, bbox_loss,landmark_loss,L2_loss,lr,acc = sess.run([cls_loss_op, bbox_loss_op,landmark_loss_op,L2_loss_op,lr_op,accuracy_op],
+                                                             feed_dict={input_image: image_batch_array, label: label_batch_array, bbox_target: bbox_batch_array, landmark_target: landmark_batch_array,global_:step})
 
-                cls_loss = sess.run(cls_loss_op,
-                                     feed_dict={input_image: image_batch_array, label: label_batch_array, bbox_target: bbox_batch_array, landmark_target: landmark_batch_array,global_:step})
 
                 print("%s : Step: %d, accuracy: %3f, cls loss: %4f, bbox loss: %4f, landmark loss: %4f,L2 loss: %4f, lr: %4f" % (
                 datetime.now(), step+1, acc, cls_loss, bbox_loss, landmark_loss, L2_loss, lr))
