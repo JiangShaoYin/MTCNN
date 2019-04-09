@@ -83,7 +83,7 @@ def bbox_ohem_orginal(bbox_pred,bbox_target,label):
     return tf.reduce_mean(square_error)
 
 #label=1 or label=-1 then do regression
-def bbox_ohem(bbox_pred, bbox_target, label):  # bbox经过shuffle，不一定是4维度的？
+def bbox_ohem(bbox_pred, bbox_target, label):  # bbox经过shuffle，是4维度的，做数据集的时候，把负例的框框，全写成了0
     zeros_index = tf.zeros_like(label, dtype=tf.float32)
     ones_index = tf.ones_like(label, dtype=tf.float32)
 
