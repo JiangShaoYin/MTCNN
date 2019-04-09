@@ -118,7 +118,7 @@ for annotation in annotations:
                 continue 
             crop_box = np.array([nx1, ny1, nx2, ny2])
             #yu gt de offset
-            offset_x1 = (x1 - nx1) / float(size)  # crop框偏移比例，相比于crop框
+            offset_x1 = (x1 - nx1) / float(size)  # crop框偏移比例，相比于crop框的size
             offset_y1 = (y1 - ny1) / float(size)
             offset_x2 = (x2 - nx2) / float(size)
             offset_y2 = (y2 - ny2) / float(size)

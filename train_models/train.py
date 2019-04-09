@@ -56,7 +56,7 @@ def train(net_factory, prefix, end_epoch, base_dir, display=200, base_lr=0.01):
         # dataset_dir = '../prepare_data/imglists/PNet\\train_PNet_landmark.tfrecord_shuffle'
         dataset_dir = os.path.join(base_dir,'train_%s_landmark.tfrecord_shuffle' % net)
         print(dataset_dir)
-        # 一个batch == 4608， 从数据集中读取1个batch的pixel和label
+        # 一个batch == 4608， 从数据集中读取1个batch的pixel和，label
         image_batch, label_batch, bbox_batch,landmark_batch = read_single_tfrecord(dataset_dir, config.BATCH_SIZE, net)
         
     #RNet use 3 tfrecords to get data    
@@ -97,7 +97,7 @@ def train(net_factory, prefix, end_epoch, base_dir, display=200, base_lr=0.01):
 
     global_ = tf.Variable(tf.constant(0), trainable=False)
 
-    #class,regression
+    #前向传播 class,regression
     cls_loss_op, bbox_loss_op, landmark_loss_op, L2_loss_op, accuracy_op = net_factory(input_image, label, bbox_target,landmark_target,training=True)
     #train,update learning rate(3 loss)
     train_op, lr_op = train_model(base_lr, radio_cls_loss * cls_loss_op + radio_bbox_loss * bbox_loss_op + radio_landmark_loss * landmark_loss_op + L2_loss_op, num,global_)

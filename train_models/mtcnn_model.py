@@ -83,22 +83,24 @@ def bbox_ohem_orginal(bbox_pred,bbox_target,label):
     return tf.reduce_mean(square_error)
 
 #label=1 or label=-1 then do regression
-def bbox_ohem(bbox_pred,bbox_target,label):
+def bbox_ohem(bbox_pred, bbox_target, label):  # bbox经过shuffle，不一定是4维度的？
     zeros_index = tf.zeros_like(label, dtype=tf.float32)
-    ones_index = tf.ones_like(label,dtype=tf.float32)
+    ones_index = tf.ones_like(label, dtype=tf.float32)
+
+    # valid_inds是个1维4608个成员的tensor，label中的pos和part变为1， neg变为0，
     valid_inds = tf.where(tf.equal(tf.abs(label), 1), ones_index, zeros_index)
-    #(batch,)
-    square_error = tf.square(bbox_pred-bbox_target)
-    square_error = tf.reduce_sum(square_error,axis=1)
-    #keep_num scalar
+    # (batch,)batchsize
+    square_error = tf.square(bbox_pred-bbox_target)  # 与标签差值的平方，为什么计算结果shape为(4806,2)
+    square_error = tf.reduce_sum(square_error, axis=1)  # 对1维求和，计算后square_error = (4806, )
+    # num_valid == 数据集中pos和part图片的数量
     num_valid = tf.reduce_sum(valid_inds)
-    #keep_num = tf.cast(num_valid*num_keep_radio,dtype=tf.int32)
-    keep_num = tf.cast(num_valid, dtype=tf.int32)
+    keep_num = tf.cast(num_valid, dtype=tf.int32)  # 将num_valid转为int型
+
     #keep valid index square_error
-    square_error = square_error*valid_inds
-    _, k_index = tf.nn.top_k(square_error, k=keep_num)
-    square_error = tf.gather(square_error, k_index)
-    return tf.reduce_mean(square_error)
+    square_error = square_error * valid_inds           # (4806, ) * (4806, )
+    _, k_index = tf.nn.top_k(square_error, k=keep_num) # 将pos和part的框框损失提出来
+    square_error = tf.gather(square_error, k_index)    # 将损失写入新的square_error
+    return tf.reduce_mean(square_error)                # 求损失的平均值
 
 def landmark_ohem(landmark_pred,landmark_target,label):
     #keep label =-2  then do landmark detection
@@ -151,8 +153,7 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
         bbox_pred = slim.conv2d(net4, num_outputs=4, kernel_size=[1, 1], stride=1, scope='conv4_2', activation_fn=None)
             #print(bbox_pred.get_shape())
         # batch*H*W*10
-        with tf.Session():
-            print(conv4_1.eval())
+
         landmark_pred = slim.conv2d(net4,num_outputs=10, kernel_size=[1, 1], stride=1,scope='conv4_3', activation_fn=None)
 
         if training:
