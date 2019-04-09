@@ -20,22 +20,25 @@ def dense_to_one_hot(labels_dense,num_classes):
 #cls_prob:batch*2
 #label:batch
 
-def cls_ohem(cls_prob, label):
-    zeros = tf.zeros_like(label)
+def cls_ohem(cls_prob, label):  # online hard example mining
+    zeros = tf.zeros_like(label)  # 产生与label同维度的全0矩阵zeros
     #label=-1 --> label=0net_factory
-    label_filter_invalid = tf.where(tf.less(label,0), zeros, label)
+
+    label_filter_invalid = tf.where(tf.less(label, 0), zeros, label)  # 将label中 < 0 的数，换成0，> 0 的数，保持不变
+
     #tf.where(input, a,b)，其中a，b均为尺寸一致的tensor，作用是将a中对应input中true的位置的元素值不变，其余元素进行替换，替换成b中对应位置的元素值
     num_cls_prob = tf.size(cls_prob)
-    cls_prob_reshape = tf.reshape(cls_prob,[num_cls_prob,-1])
-    label_int = tf.cast(label_filter_invalid,tf.int32)
-    num_row = tf.to_int32(cls_prob.get_shape()[0])
-    row = tf.range(num_row)*2
-    indices_ = row + label_int
-    label_prob = tf.squeeze(tf.gather(cls_prob_reshape, indices_))
-    loss = -tf.log(label_prob+1e-10)
+    cls_prob_reshape = tf.reshape(cls_prob, [num_cls_prob,-1])  # 将矩阵转置成多行1列的数据
+    label_int = tf.cast(label_filter_invalid,tf.int32)  #
+    num_row = tf.to_int32(cls_prob.get_shape()[0])  # 获取行数
+    row = tf.range(num_row) * 2  # 产生[0,1.....2303] * 2 的张量
+    indices_ = row + label_int  # 同维度的每个元素加上一个对应的label_int值
+    label_prob = tf.squeeze(tf.gather(cls_prob_reshape, indices_))   # cls_prob_reshape == (9216, 1), indices = 4608 一维数组
+                                                                     # label_prob经过squeeze成为了1维数组
+    loss = -tf.log(label_prob+1e-10)  #
     zeros = tf.zeros_like(label_prob, dtype=tf.float32)
     ones = tf.ones_like(label_prob,dtype=tf.float32)
-    valid_inds = tf.where(label < zeros,zeros,ones)
+    valid_inds = tf.where(label < zeros, zeros, ones)   # 二值化处理，<0 置为0，>0 置为1
     num_valid = tf.reduce_sum(valid_inds)
     keep_num = tf.cast(num_valid*num_keep_radio,dtype=tf.int32)
     #set 0 to invalid sample
@@ -115,6 +118,7 @@ def cal_accuracy(cls_prob,label):
     return accuracy_op
 #construct Pnet
 #label:batch
+
 def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True):  # P_Net的前向传播
 
     with slim.arg_scope([slim.conv2d],      # 设置默认参数
@@ -132,10 +136,12 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
             #   print(net.get_shape())
         net4 = slim.conv2d(net3,num_outputs=32,kernel_size=[3,3],stride=1,scope='conv3')     # 第3层卷积网络
             #    print(net.get_shape())
-            #batch*H*W*2                                                                   # 第4层卷积网络
+
+                                                                                            # 第4-1层卷积网络
         conv4_1 = slim.conv2d(net4, num_outputs=2, kernel_size=[1, 1], stride=1, scope='conv4_1', activation_fn = tf.nn.softmax)
-            #      print(conv4_1.get_shape())
-            # batch*H*W*4
+ #       with tf.Session():
+#          print(conv4_1.eval())
+
         bbox_pred = slim.conv2d(net4, num_outputs=4, kernel_size=[1, 1], stride=1, scope='conv4_2', activation_fn=None)
             #print(bbox_pred.get_shape())
         # batch*H*W*10
@@ -144,7 +150,7 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
         if training:
             # batch*2
             cls_prob = tf.squeeze(conv4_1, [1, 2], name='cls_prob')
-            cls_loss = cls_ohem(cls_prob,label)
+            cls_loss = cls_ohem(cls_prob,label)  # 根据预测结果，计算loss，label 1正例，0负例，-1是part
             # batch
             bbox_pred = tf.squeeze(bbox_pred, [1, 2], name='bbox_pred')
             bbox_loss = bbox_ohem(bbox_pred, bbox_target, label)
@@ -162,7 +168,10 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
             bbox_pred_test = tf.squeeze(bbox_pred,axis=0)
             landmark_pred_test = tf.squeeze(landmark_pred,axis=0)
             return cls_pro_test,bbox_pred_test,landmark_pred_test
-        
+
+
+
+
 def R_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True):
     with slim.arg_scope([slim.conv2d],
                         activation_fn = prelu,
