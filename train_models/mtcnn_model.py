@@ -36,14 +36,16 @@ def cls_ohem(cls_prob, label):  # online hard example mining
     label_prob = tf.squeeze(tf.gather(cls_prob_reshape, indices_))   # cls_prob_reshape == (9216, 1), indices = 4608 一维数组
                                                                      # label_prob经过squeeze成为了1维数组
     loss = -tf.log(label_prob+1e-10)  #
+
     zeros = tf.zeros_like(label_prob, dtype=tf.float32)
     ones = tf.ones_like(label_prob,dtype=tf.float32)
-    valid_inds = tf.where(label < zeros, zeros, ones)   # 二值化处理，<0 置为0，>0 置为1
-    num_valid = tf.reduce_sum(valid_inds)
-    keep_num = tf.cast(num_valid*num_keep_radio,dtype=tf.int32)
+    valid_inds = tf.where(label < zeros, zeros, ones)   # valid_inds = label的二值化处理，<0 置为0，>0 置为1
+
+    num_valid = tf.reduce_sum(valid_inds)  # 元素个数
+    keep_num = tf.cast(num_valid * num_keep_radio,dtype=tf.int32)  # 只保留70%的数据
     #set 0 to invalid sample
-    loss = loss * valid_inds
-    loss,_ = tf.nn.top_k(loss, k=keep_num)
+    loss = loss * valid_inds  # loss = -tf.log(label_prob+1e-10)，逐位相乘，保持维度不变
+    loss,_ = tf.nn.top_k(loss, k=keep_num)  # 取出最大的前k个loss
     return tf.reduce_mean(loss)
 
 
@@ -61,6 +63,7 @@ def bbox_ohem_smooth_L1_loss(bbox_pred,bbox_target,label):
     _, k_index = tf.nn.top_k(smooth_loss, k=keep_num)
     smooth_loss_picked = tf.gather(smooth_loss, k_index)
     return tf.reduce_mean(smooth_loss_picked)
+
 def bbox_ohem_orginal(bbox_pred,bbox_target,label):
     zeros_index = tf.zeros_like(label, dtype=tf.float32)
     #pay attention :there is a bug!!!!
@@ -74,6 +77,7 @@ def bbox_ohem_orginal(bbox_pred,bbox_target,label):
     _, k_index = tf.nn.top_k(square_error, k=keep_num)
     square_error = tf.gather(square_error, k_index)
     return tf.reduce_mean(square_error)
+
 #label=1 or label=-1 then do regression
 def bbox_ohem(bbox_pred,bbox_target,label):
     zeros_index = tf.zeros_like(label, dtype=tf.float32)
