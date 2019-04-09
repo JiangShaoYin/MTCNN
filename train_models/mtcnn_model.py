@@ -9,6 +9,7 @@ def prelu(inputs):
     pos = tf.nn.relu(inputs)
     neg = alphas * (inputs-abs(inputs))*0.5
     return pos + neg
+
 def dense_to_one_hot(labels_dense,num_classes):
     num_labels = labels_dense.shape[0]
     index_offset = np.arange(num_labels)*num_classes
@@ -41,6 +42,8 @@ def cls_ohem(cls_prob, label):
     loss = loss * valid_inds
     loss,_ = tf.nn.top_k(loss, k=keep_num)
     return tf.reduce_mean(loss)
+
+
 def bbox_ohem_smooth_L1_loss(bbox_pred,bbox_target,label):
     sigma = tf.constant(1.0)
     threshold = 1.0/(sigma**2)
@@ -112,48 +115,44 @@ def cal_accuracy(cls_prob,label):
     return accuracy_op
 #construct Pnet
 #label:batch
-def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True):
-    #define common param
-    with slim.arg_scope([slim.conv2d],
+def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True):  # P_Net的前向传播
+
+    with slim.arg_scope([slim.conv2d],      # 设置默认参数
                         activation_fn=prelu,
                         weights_initializer=slim.xavier_initializer(),
                         biases_initializer=tf.zeros_initializer(),
                         weights_regularizer=slim.l2_regularizer(0.0005), 
                         padding='valid'):
-        print(inputs.get_shape())
-        net = slim.conv2d(inputs, 10, 3, stride=1,scope='conv1')
-        print(net.get_shape())
-        net = slim.max_pool2d(net, kernel_size=[2,2], stride=2, scope='pool1', padding='SAME')
-        print(net.get_shape())
-        net = slim.conv2d(net,num_outputs=16,kernel_size=[3,3],stride=1,scope='conv2')
-        print(net.get_shape())
-        net = slim.conv2d(net,num_outputs=32,kernel_size=[3,3],stride=1,scope='conv3')
-        print(net.get_shape())
-        #batch*H*W*2
-        conv4_1 = slim.conv2d(net,num_outputs=2,kernel_size=[1,1],stride=1,scope='conv4_1',activation_fn=tf.nn.softmax)
-        #conv4_1 = slim.conv2d(net,num_outputs=1,kernel_size=[1,1],stride=1,scope='conv4_1',activation_fn=tf.nn.sigmoid)
-        
-        print(conv4_1.get_shape())
-        #batch*H*W*4
-        bbox_pred = slim.conv2d(net,num_outputs=4,kernel_size=[1,1],stride=1,scope='conv4_2',activation_fn=None)
-        print(bbox_pred.get_shape())
-        #batch*H*W*10
-        landmark_pred = slim.conv2d(net,num_outputs=10,kernel_size=[1,1],stride=1,scope='conv4_3',activation_fn=None)
-        print(landmark_pred.get_shape())
-        #cls_prob_original = conv4_1 
-        #bbox_pred_original = bbox_pred
-        if training:
-            #batch*2
-            cls_prob = tf.squeeze(conv4_1,[1,2],name='cls_prob')
-            cls_loss = cls_ohem(cls_prob,label)
-            #batch
-            bbox_pred = tf.squeeze(bbox_pred,[1,2],name='bbox_pred')
-            bbox_loss = bbox_ohem(bbox_pred,bbox_target,label)
-            #batch*10
-            landmark_pred = tf.squeeze(landmark_pred,[1,2],name="landmark_pred")
-            landmark_loss = landmark_ohem(landmark_pred,landmark_target,label)
+            #   print(inputs.get_shape())
+        net1 = slim.conv2d(inputs, 10, 3, stride=1,scope='conv1')                             # 第1层卷积网络
+            #   print(net.get_shape())  # 池化核 2 * 2， 步长 2
+        net2 = slim.max_pool2d(net1, kernel_size=[2,2], stride=2, scope='pool1', padding='SAME') # 第1层池化
+            #   print(net.get_shape())
+        net3 = slim.conv2d(net2,num_outputs=16,kernel_size=[3,3],stride=1,scope='conv2')     # 第2层卷积网络
+            #   print(net.get_shape())
+        net4 = slim.conv2d(net3,num_outputs=32,kernel_size=[3,3],stride=1,scope='conv3')     # 第3层卷积网络
+            #    print(net.get_shape())
+            #batch*H*W*2                                                                   # 第4层卷积网络
+        conv4_1 = slim.conv2d(net4, num_outputs=2, kernel_size=[1, 1], stride=1, scope='conv4_1', activation_fn = tf.nn.softmax)
+            #      print(conv4_1.get_shape())
+            # batch*H*W*4
+        bbox_pred = slim.conv2d(net4, num_outputs=4, kernel_size=[1, 1], stride=1, scope='conv4_2', activation_fn=None)
+            #print(bbox_pred.get_shape())
+        # batch*H*W*10
+        landmark_pred = slim.conv2d(net4,num_outputs=10, kernel_size=[1, 1], stride=1,scope='conv4_3', activation_fn=None)
 
-            accuracy = cal_accuracy(cls_prob,label)
+        if training:
+            # batch*2
+            cls_prob = tf.squeeze(conv4_1, [1, 2], name='cls_prob')
+            cls_loss = cls_ohem(cls_prob,label)
+            # batch
+            bbox_pred = tf.squeeze(bbox_pred, [1, 2], name='bbox_pred')
+            bbox_loss = bbox_ohem(bbox_pred, bbox_target, label)
+            # batch*10
+            landmark_pred = tf.squeeze(landmark_pred, [1, 2], name="landmark_pred")
+            landmark_loss = landmark_ohem(landmark_pred, landmark_target, label)
+
+            accuracy = cal_accuracy(cls_prob, label)
             L2_loss = tf.add_n(slim.losses.get_regularization_losses())
             return cls_loss,bbox_loss,landmark_loss,L2_loss,accuracy 
         #test

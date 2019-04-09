@@ -5,7 +5,7 @@ from easydict import EasyDict as edict
 config = edict()
 
 # config.BATCH_SIZE = 384
-config.BATCH_SIZE = 384*4*3
+config.BATCH_SIZE = 384*4*3 # 4608
 config.CLS_OHEM = True
 config.CLS_OHEM_RATIO = 0.7
 config.BBOX_OHEM = False

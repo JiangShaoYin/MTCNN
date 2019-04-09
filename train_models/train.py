@@ -13,62 +13,16 @@ import random
 import numpy.random as npr
 import cv2
 def train_model(base_lr, loss, data_num, global_):
-    """
-    train model
-    :param base_lr: base learning rate
-    :param loss: loss
-    :param data_num:
-    :return:
-    train_op, lr_op
-    """
+
     lr_factor = 0.1
     global_step = tf.Variable(0, trainable=False)
-    #LR_EPOCH [8,14]
-    #boundaried [num_batch,num_batch]
-    # boundaries = [int(epoch * data_num / config.BATCH_SIZE) for epoch in config.LR_EPOCH]
-    # #lr_values[0.01,0.001,0.0001,0.00001]
-    # lr_values = [base_lr * (lr_factor ** x) for x in range(0, len(config.LR_EPOCH) + 1)]
-    # # lr_values = [0.1,0.01,0.001]
-    #control learning rate
-    # lr_op = tf.train.piecewise_constant(global_step, boundaries, lr_values)
-    # lr_op = 0.01
-    # optimizer = tf.train.MomentumOptimizer(lr_op, 0.9)
-    # optimizer = tf.train.MomentumOptimizer(learning_rate=0.01, momentum=0.9)
-    # train_op = optimizer.minimize(loss, global_step)
-
-    # train_op = tf.train.GradientDescentOptimizer(learning_rate=0.01).minimize(loss, global_step)
-
-    lr_op = tf.train.natural_exp_decay(learning_rate=0.01,global_step=global_,decay_steps=1000,decay_rate=0.5,staircase=True)
-    # lr_op = tf.train.polynomial_decay(learning_rate=0.01,global_step=global_,decay_steps=1000,end_learning_rate=0.0001,power=0.5,cycle=True)
-
+    lr_op = tf.train.natural_exp_decay(learning_rate=0.01,global_step=global_,
+                                       decay_steps=1000,decay_rate=0.5,staircase=True)
     train_op = tf.train.AdamOptimizer(lr_op).minimize(loss, global_step)
-
     return train_op, lr_op
-'''
-certain samples mirror
+
 def random_flip_images(image_batch,label_batch,landmark_batch):
-    num_images = image_batch.shape[0]
-    random_number = npr.choice([0,1],num_images,replace=True)
-    #the index of image needed to flip
-    indexes = np.where(random_number>0)[0]
-    fliplandmarkindexes = np.where(label_batch[indexes]==-2)[0]
-    
-    #random flip    
-    for i in indexes:
-        cv2.flip(image_batch[i],1,image_batch[i])
-    #pay attention: flip landmark    
-    for i in fliplandmarkindexes:
-        landmark_ = landmark_batch[i].reshape((-1,2))
-        landmark_ = np.asarray([(1-x, y) for (x, y) in landmark_])
-        landmark_[[0, 1]] = landmark_[[1, 0]]#left eye<->right eye
-        landmark_[[3, 4]] = landmark_[[4, 3]]#left mouth<->right mouth        
-        landmark_batch[i] = landmark_.ravel()
-    return image_batch,landmark_batch
-'''
-# all mini-batch mirror
-def random_flip_images(image_batch,label_batch,landmark_batch):
-    #mirror
-    if random.choice([0,1]) > 0:
+    if random.choice([0, 1]) > 0:
         num_images = image_batch.shape[0]
         fliplandmarkindexes = np.where(label_batch==-2)[0]
         flipposindexes = np.where(label_batch==1)[0]
@@ -85,36 +39,24 @@ def random_flip_images(image_batch,label_batch,landmark_batch):
             landmark_[[0, 1]] = landmark_[[1, 0]]#left eye<->right eye
             landmark_[[3, 4]] = landmark_[[4, 3]]#left mouth<->right mouth        
             landmark_batch[i] = landmark_.ravel()
-        
     return image_batch,landmark_batch
 
-def train(net_factory, prefix, end_epoch, base_dir,
-          display=200, base_lr=0.01):
-    """
-    train PNet/RNet/ONet
-    :param net_factory:
-    :param prefix:
-    :param end_epoch:16
-    :param dataset:
-    :param display:
-    :param base_lr:
-    :return:
-    """
+def train(net_factory, prefix, end_epoch, base_dir, display=200, base_lr=0.01):
     net = prefix.split('/')[-1]
-    #label file
+
     label_file = os.path.join(base_dir,'train_%s_landmark.txt' % net)
-    #label_file = os.path.join(base_dir,'landmark_12_few.txt')
-    print(label_file)
+    print(label_file)     # label_file = os.path.join(base_dir,'landmark_12_few.txt')
     f = open(label_file, 'r')
-    num = len(f.readlines())
+    num = len(f.readlines())  # 142w个 数据
     print("Total datasets is: ", num)
-    print(prefix)
+    print(prefix)  # prefix == '../data/MTCNN_model/PNet_landmark/PNet'
 
     #PNet use this method to get data
     if net == 'PNet':
-        #dataset_dir = os.path.join(base_dir,'train_%s_ALL.tfrecord_shuffle' % net)
+        # dataset_dir = '../prepare_data/imglists/PNet\\train_PNet_landmark.tfrecord_shuffle'
         dataset_dir = os.path.join(base_dir,'train_%s_landmark.tfrecord_shuffle' % net)
         print(dataset_dir)
+        # 一个batch == 4608， 从数据集中读取1个batch的pixel和label
         image_batch, label_batch, bbox_batch,landmark_batch = read_single_tfrecord(dataset_dir, config.BATCH_SIZE, net)
         
     #RNet use 3 tfrecords to get data    
@@ -139,7 +81,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
     #landmark_dir    
     if net == 'PNet':
         image_size = 12
-        radio_cls_loss = 1.0;radio_bbox_loss = 0.5;radio_landmark_loss = 0.5;
+        radio_cls_loss = 1.0; radio_bbox_loss = 0.5; radio_landmark_loss = 0.5;  # cls_prob == classify probability
     elif net == 'RNet':
         image_size = 24
         radio_cls_loss = 1.0;radio_bbox_loss = 0.5;radio_landmark_loss = 0.5;
@@ -154,10 +96,11 @@ def train(net_factory, prefix, end_epoch, base_dir,
     landmark_target = tf.placeholder(tf.float32,shape=[config.BATCH_SIZE,10],name='landmark_target')
 
     global_ = tf.Variable(tf.constant(0), trainable=False)
+
     #class,regression
-    cls_loss_op,bbox_loss_op,landmark_loss_op,L2_loss_op,accuracy_op = net_factory(input_image, label, bbox_target,landmark_target,training=True)
+    cls_loss_op, bbox_loss_op, landmark_loss_op, L2_loss_op, accuracy_op = net_factory(input_image, label, bbox_target,landmark_target,training=True)
     #train,update learning rate(3 loss)
-    train_op, lr_op = train_model(base_lr, radio_cls_loss*cls_loss_op + radio_bbox_loss*bbox_loss_op + radio_landmark_loss*landmark_loss_op + L2_loss_op, num,global_)
+    train_op, lr_op = train_model(base_lr, radio_cls_loss * cls_loss_op + radio_bbox_loss * bbox_loss_op + radio_landmark_loss * landmark_loss_op + L2_loss_op, num,global_)
     # init
     init = tf.global_variables_initializer()
     sess = tf.Session()
@@ -192,15 +135,7 @@ def train(net_factory, prefix, end_epoch, base_dir,
             image_batch_array, label_batch_array, bbox_batch_array,landmark_batch_array = sess.run([image_batch, label_batch, bbox_batch,landmark_batch])
             #random flip
             image_batch_array,landmark_batch_array = random_flip_images(image_batch_array,label_batch_array,landmark_batch_array)
-            '''
-            print image_batch_array.shape
-            print label_batch_array.shape
-            print bbox_batch_array.shape
-            print landmark_batch_array.shape
-            print label_batch_array[0]
-            print bbox_batch_array[0]
-            print landmark_batch_array[0]
-            '''
+
             _,_,summary = sess.run([train_op, lr_op ,summary_op], feed_dict={input_image: image_batch_array, label: label_batch_array, bbox_target: bbox_batch_array,landmark_target:landmark_batch_array,global_:step})
             
             if (step+1) % display == 0:
