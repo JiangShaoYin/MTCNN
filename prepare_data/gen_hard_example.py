@@ -220,7 +220,7 @@ if __name__ == '__main__':
         image_size = 48
 
     base_dir = '../prepare_data/WIDER_train'
-    data_dir = '%s' % str(image_size)
+    data_dir = '%s' % str(image_size)  # data_dir = '24'
     
     neg_dir = get_path(data_dir, 'negative')
     pos_dir = get_path(data_dir, 'positive')

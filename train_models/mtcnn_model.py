@@ -46,7 +46,7 @@ def cls_ohem(cls_prob, label):  # online hard example mining
     valid_inds = tf.where(label < zeros, zeros, ones)   # valid_inds = label的二值化处理，<0 置为0，>0 置为1
 
     num_valid = tf.reduce_sum(valid_inds)  # 元素个数
-    keep_num = tf.cast(num_valid * num_keep_radio,dtype=tf.int32)  # 只保留最大的前70%的数据
+    keep_num = tf.cast(num_valid * num_keep_radio, dtype=tf.int32)  # 只保留最大的前70%的数据
     #set 0 to invalid sample
     loss = loss * valid_inds  # loss = -tf.log(label_prob+1e-10)，逐位相乘，保持维度不变，loss值记录计算结果， 与label结果的相似度，值越大，判断结果与label距离越远
     loss, _ = tf.nn.top_k(loss, k=keep_num)  # 取出最大的前k个loss
