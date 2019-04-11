@@ -4,8 +4,7 @@ import tensorflow as tf
 import numpy as np
 import cv2
 import os
-#just for RNet and ONet, since I change the method of making tfrecord
-#as for PNet
+#just for RNet and ONet, since I change the method of making tfrecord as for PNet
 def read_single_tfrecord(tfrecord_file, batch_size, net):
     # generate a input queue
     # each epoch shuffle

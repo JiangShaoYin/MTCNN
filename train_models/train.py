@@ -16,9 +16,9 @@ def train_model(base_lr, loss, data_num, global_):
 
     lr_factor = 0.1
     global_step = tf.Variable(0, trainable=False)
-    lr_op = tf.train.natural_exp_decay(learning_rate=0.01,global_step=global_,
+    lr_op = tf.train.natural_exp_decay(learning_rate=0.01,global_step=global_,  # 以指数下降法更新学习率
                                        decay_steps=1000,decay_rate=0.5,staircase=True)
-    train_op = tf.train.AdamOptimizer(lr_op).minimize(loss, global_step)
+    train_op = tf.train.AdamOptimizer(lr_op).minimize(loss, global_step)  # adam优化器
     return train_op, lr_op
 
 def random_flip_images(image_batch,label_batch,landmark_batch):
@@ -99,7 +99,7 @@ def train(net_factory, prefix, end_epoch, base_dir, display=200, base_lr=0.01):
 
     #前向传播 class,regression
     cls_loss_op, bbox_loss_op, landmark_loss_op, L2_loss_op, accuracy_op = net_factory(input_image, label, bbox_target,landmark_target,training=True)
-    #train,update learning rate(3 loss)
+    #train,update learning rate(3 loss)，为什么要对detection和alignment的损失 * 0.5
     train_op, lr_op = train_model(base_lr, radio_cls_loss * cls_loss_op + radio_bbox_loss * bbox_loss_op + radio_landmark_loss * landmark_loss_op + L2_loss_op, num,global_)
     # init
     init = tf.global_variables_initializer()
@@ -107,47 +107,53 @@ def train(net_factory, prefix, end_epoch, base_dir, display=200, base_lr=0.01):
     #save model
     saver = tf.train.Saver(max_to_keep=0)
     sess.run(init)
-    #visualize some variables
-    tf.summary.scalar("cls_loss",cls_loss_op)#cls_loss
-    tf.summary.scalar("bbox_loss",bbox_loss_op)#bbox_loss
-    tf.summary.scalar("landmark_loss",landmark_loss_op)#landmark_loss
-    tf.summary.scalar("cls_accuracy",accuracy_op)#cls_acc
+    # 数据的可视化 visualize some variables
+    tf.summary.scalar("cls_loss",cls_loss_op) #cls_loss
+    tf.summary.scalar("bbox_loss",bbox_loss_op) #bbox_loss
+    tf.summary.scalar("landmark_loss",landmark_loss_op) #landmark_loss
+    tf.summary.scalar("cls_accuracy",accuracy_op) #cls_acc
     tf.summary.scalar("learning rate", lr_op)  # learning rate
     summary_op = tf.summary.merge_all()
     logs_dir = "../logs/%s" %(net)
     if os.path.exists(logs_dir) == False:
-        os.mkdir(logs_dir)
+        os.mkdir(logs_dir)                     # logs文件夹的
+
     writer = tf.summary.FileWriter(logs_dir,sess.graph)
     #begin 
     coord = tf.train.Coordinator()
-    #begin enqueue thread
+    #begin enqueue thread 启动多个工作线程同时将多个tensor（训练数据）推送入文件名称队列中
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
     i = 0
     #total steps
-    MAX_STEP = int(num / config.BATCH_SIZE + 1) * end_epoch
+    MAX_STEP = int(num / config.BATCH_SIZE + 1) * end_epoch  # end_epoch训练周期？
     epoch = 0
+    # 防止内存溢出？
     sess.graph.finalize()    
     try:
         for step in range(MAX_STEP):
             i = i + 1
+            # 使用 coord.should_stop()来查询是否应该终止所有线程，当文件队列（queue）中的所有文件都已经读取出列的时候，会抛出一个OutofRangeError的异常，这时候就应该停止Sesson中的所有线程
             if coord.should_stop():
                 break
             image_batch_array, label_batch_array, bbox_batch_array,landmark_batch_array = sess.run([image_batch, label_batch, bbox_batch,landmark_batch])
-            #random flip
-            image_batch_array,landmark_batch_array = random_flip_images(image_batch_array,label_batch_array,landmark_batch_array)
-
-            _,_,summary = sess.run([train_op, lr_op ,summary_op], feed_dict={input_image: image_batch_array, label: label_batch_array, bbox_target: bbox_batch_array,landmark_target:landmark_batch_array,global_:step})
-            
+            #随机翻转图片random flip
+            image_batch_array, landmark_batch_array = random_flip_images(image_batch_array,
+                                                                        label_batch_array, landmark_batch_array)
+            # 计算总的损失
+            _, _, summary = sess.run([train_op, lr_op, summary_op], feed_dict={input_image: image_batch_array,
+                                                                               label: label_batch_array,
+                                                                               bbox_target: bbox_batch_array,
+                                                                               landmark_target:landmark_batch_array,
+                                                                               global_:step})
+            # 每过100轮，打印loss
             if (step+1) % display == 0:
-                #acc = accuracy(cls_pred, labels_batch)
-                cls_loss, bbox_loss,landmark_loss,L2_loss,lr,acc = sess.run([cls_loss_op, bbox_loss_op,landmark_loss_op,L2_loss_op,lr_op,accuracy_op],
+                cls_loss, bbox_loss, landmark_loss, L2_loss, lr, acc = sess.run([cls_loss_op, bbox_loss_op,landmark_loss_op,L2_loss_op,lr_op,accuracy_op],
                                                              feed_dict={input_image: image_batch_array, label: label_batch_array, bbox_target: bbox_batch_array, landmark_target: landmark_batch_array,global_:step})
 
 
-                print("%s : Step: %d, accuracy: %3f, cls loss: %4f, bbox loss: %4f, landmark loss: %4f,L2 loss: %4f, lr: %4f" % (
-                datetime.now(), step+1, acc, cls_loss, bbox_loss, landmark_loss, L2_loss, lr))
-            #save every two epochs
-            if i * config.BATCH_SIZE > num*2:
+                print("%s : Step: %d, accuracy: %3f, cls loss: %4f, bbox loss: %4f, landmark loss: %4f,L2 loss: %4f, lr: %4f" % (datetime.now(), step+1, acc, cls_loss, bbox_loss, landmark_loss, L2_loss, lr))
+            # 每两个周期保存一次
+            if i * config.BATCH_SIZE > num * 2:
                 epoch = epoch + 1
                 i = 0
                 saver.save(sess, prefix, global_step=epoch*2)

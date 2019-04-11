@@ -102,29 +102,30 @@ def bbox_ohem(bbox_pred, bbox_target, label):  # bbox经过shuffle，是4维度�
     square_error = tf.gather(square_error, k_index)    # 将损失写入新的square_error
     return tf.reduce_mean(square_error)                # 求损失的平均值
 
-def landmark_ohem(landmark_pred,landmark_target,label):
+def landmark_ohem(landmark_pred, landmark_target, label):
     #keep label =-2  then do landmark detection
     ones = tf.ones_like(label,dtype=tf.float32)
     zeros = tf.zeros_like(label,dtype=tf.float32)
-    valid_inds = tf.where(tf.equal(label,-2),ones,zeros)
-    square_error = tf.square(landmark_pred-landmark_target)
-    square_error = tf.reduce_sum(square_error,axis=1)
-    num_valid = tf.reduce_sum(valid_inds)
+    valid_inds = tf.where(tf.equal(label,-2),ones,zeros)  # 将标签为-2的改为1，其他的都变成0
+
+    square_error = tf.square(landmark_pred - landmark_target) # 计算平方差
+    square_error = tf.reduce_sum(square_error, axis=1)  # 计算损失，5个特征点与ground truth的之间坐标差值的平方
+    num_valid = tf.reduce_sum(valid_inds)  # 统计1个batch里面， 有landmark信息的图片数量
     #keep_num = tf.cast(num_valid*num_keep_radio,dtype=tf.int32)
-    keep_num = tf.cast(num_valid, dtype=tf.int32)
-    square_error = square_error*valid_inds
+    keep_num = tf.cast(num_valid, dtype=tf.int32)  #
+    square_error = square_error * valid_inds # 将4806个数里面， 非landmark位的置0
     _, k_index = tf.nn.top_k(square_error, k=keep_num)
     square_error = tf.gather(square_error, k_index)
     return tf.reduce_mean(square_error)
     
 def cal_accuracy(cls_prob,label):
-    pred = tf.argmax(cls_prob,axis=1)
-    label_int = tf.cast(label,tf.int64)
-    cond = tf.where(tf.greater_equal(label_int,0))
+    pred = tf.argmax(cls_prob, axis=1)  #
+    label_int = tf.cast(label, tf.int64)  # label 1正例,0负例，label内取值范围-2, -1, 0 ,1,
+    cond = tf.where(tf.greater_equal(label_int, 0))   # 把label中，数值 >= 0 的数的下标，写入cond
     picked = tf.squeeze(cond)
-    label_picked = tf.gather(label_int,picked)
-    pred_picked = tf.gather(pred,picked)
-    accuracy_op = tf.reduce_mean(tf.cast(tf.equal(label_picked,pred_picked),tf.float32))
+    label_picked = tf.gather(label_int, picked)  # 将label中，数值为1,0的值，按照picked的标识，写入label_picked中
+    pred_picked = tf.gather(pred, picked)  #计算结果中的数，按照picked的标识，做同样筛选
+    accuracy_op = tf.reduce_mean(tf.cast(tf.equal(label_picked, pred_picked),tf.float32)) # 相等预测为1，不等预测为0
     return accuracy_op
 #construct Pnet
 #label:batch
@@ -135,7 +136,7 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
                         activation_fn=prelu,
                         weights_initializer=slim.xavier_initializer(),
                         biases_initializer=tf.zeros_initializer(),
-                        weights_regularizer=slim.l2_regularizer(0.0005), 
+                        weights_regularizer=slim.l2_regularizer(0.0005),  # 使用L2正则化，参数w * 0.0005再算正则化
                         padding='valid'):
             #   print(inputs.get_shape())
         net1 = slim.conv2d(inputs, 10, 3, stride=1,scope='conv1')                             # 第1层卷积网络
@@ -157,18 +158,20 @@ def P_Net(inputs,label=None,bbox_target=None,landmark_target=None,training=True)
         landmark_pred = slim.conv2d(net4,num_outputs=10, kernel_size=[1, 1], stride=1,scope='conv4_3', activation_fn=None)
 
         if training:
-            # batch*2
+            # 分类loss
             cls_prob = tf.squeeze(conv4_1, [1, 2], name='cls_prob')
             cls_loss = cls_ohem(cls_prob,label)  # 根据预测结果，计算loss，label 1正例，0负例，-1是part
-            # batch
+            # detection loss
             bbox_pred = tf.squeeze(bbox_pred, [1, 2], name='bbox_pred')
             bbox_loss = bbox_ohem(bbox_pred, bbox_target, label)
-            # batch*10
+            # 特征点loss
             landmark_pred = tf.squeeze(landmark_pred, [1, 2], name="landmark_pred")
             landmark_loss = landmark_ohem(landmark_pred, landmark_target, label)
-
+            # 准确率
             accuracy = cal_accuracy(cls_prob, label)
-            L2_loss = tf.add_n(slim.losses.get_regularization_losses())
+
+            L2_loss = tf.add_n(slim.losses.get_regularization_losses())  # 将所有参数做L2正则化
+         #   a = "12"
             return cls_loss,bbox_loss,landmark_loss,L2_loss,accuracy 
         #test
         else:
