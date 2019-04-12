@@ -122,21 +122,20 @@ def save_hard_example(net, data,save_path):
     pos_file.close()
 
 
-def t_net(prefix, epoch,
+def t_net(prefix, epoch,  # prefix保存模型文件路径
              batch_size, test_mode="PNet",
              thresh=[0.6, 0.6, 0.7], min_face_size=25,
              stride=2, slide_window=False, shuffle=False, vis=False):
     detectors = [None, None, None]
     print("Test model: ", test_mode)
     #PNet-echo
-    model_path = ['%s-%s' % (x, y) for x, y in zip(prefix, epoch)]
-    print(model_path[0])
-    # load pnet model
+    model_path = ['%s-%s' % (x, y) for x, y in zip(prefix, epoch)]  # model_path == <class 'list'>: ['../data/MTCNN_model/PNet_landmark/PNet-16', '../data/MTCNN_model/RNet_landmark/RNet-6', '../data/MTCNN_model/ONet/ONet-22']
+
     if slide_window:
         PNet = Detector(P_Net, 12, batch_size[0], model_path[0])
     else:
-        PNet = FcnDetector(P_Net, model_path[0])
-    detectors[0] = PNet
+        PNet = FcnDetector(P_Net, model_path[0])  # '../data/MTCNN_model/PNet_landmark/PNet-16'， 生成全连接detection的检测对象P_Net
+    detectors[0] = PNet  # 将PNet对象放入检测器的第1个位
 
     # load rnet model
     if test_mode in ["RNet", "ONet"]:
@@ -152,18 +151,17 @@ def t_net(prefix, epoch,
         
     basedir = '.'    
     #anno_file
-    filename = './wider_face_train_bbx_gt.txt'
+    filename = './wider_face_train_bbx_gt.txt'  # 获取检测框的ground truth值
     #read annatation(type:dict)
-    data = read_annotation(basedir,filename)
+    data = read_annotation(basedir, filename)  # 读pic的文件名，和box的ground truth值，data['images']==all image pathes
+                                                                                    #  data['bboxes'] =all image bboxes
     mtcnn_detector = MtcnnDetector(detectors=detectors, min_face_size=min_face_size,
                                    stride=stride, threshold=thresh, slide_window=slide_window)
     print("==================================")
-    # 注意是在“test”模式下
-    # imdb = IMDB("wider", image_set, root_path, dataset_path, 'test')
-    # gt_imdb = imdb.gt_imdb()
-    test_data = TestLoader(data['images'])
+    # 注意是在“test”模式下，  imdb = IMDB("wider", image_set, root_path, dataset_path, 'test')，  gt_imdb = imdb.gt_imdb()
+    test_data = TestLoader(data['images'])  # 生成输入图片的管理对象test_data
     #list
-    detections,_ = mtcnn_detector.detect_face(test_data)
+    detections, _ = mtcnn_detector.detect_face(test_data)
 
     save_net = 'RNet'
     if test_mode == "PNet":

@@ -10,18 +10,15 @@ from nms import py_nms
 class MtcnnDetector(object):
 
 
-    def __init__(self,
-                 detectors,
-                 min_face_size=25,
-                 stride=2,
-                 threshold=[0.6, 0.7, 0.7],
+    def __init__(self, detectors, min_face_size=25,
+                 stride=2, threshold=[0.6, 0.7, 0.7],
                  scale_factor=0.79,
-                 #scale_factor=0.709,#change
                  slide_window=False):
 
         self.pnet_detector = detectors[0]
         self.rnet_detector = detectors[1]
         self.onet_detector = detectors[2]
+
         self.min_face_size = min_face_size
         self.stride = stride
         self.thresh = threshold
@@ -121,7 +118,7 @@ class MtcnnDetector(object):
         new_width = int(width * scale)  # resized new width
         new_dim = (new_width, new_height)
         img_resized = cv2.resize(img, new_dim, interpolation=cv2.INTER_LINEAR)  # resized image
-        img_resized = (img_resized - 127.5) / 128
+        img_resized = (img_resized - 127.5) / 128  # pixel数值做归1化处理
         return img_resized
 
     def pad(self, bboxes, w, h):
@@ -177,7 +174,7 @@ class MtcnnDetector(object):
 
         return return_list
     
-    def detect_pnet(self, im):
+    def detect_pnet(self, im):  # 计算1张图
         """Get face candidates through pnet
 
         Parameters:
@@ -196,8 +193,8 @@ class MtcnnDetector(object):
         net_size = 12
         
         current_scale = float(net_size) / self.min_face_size  # find initial scale
-        # print("current_scale", net_size, self.min_face_size, current_scale)
-        im_resized = self.processed_image(im, current_scale)
+
+        im_resized = self.processed_image(im, current_scale)   # 将img按照scale缩放，并将pixel做归1化处理
         current_height, current_width, _ = im_resized.shape
         # fcn
         all_boxes = list()
@@ -241,6 +238,7 @@ class MtcnnDetector(object):
         boxes_c = boxes_c.T
 
         return boxes, boxes_c, None
+
     def detect_rnet(self, im, dets):
         """Get face candidates using rnet
 
@@ -390,11 +388,10 @@ class MtcnnDetector(object):
         batch_idx = 0
         sum_time = 0
         #test_data is iter_
-        for databatch in test_data:
-            #databatch(image returned)
+        for databatch in test_data:  # databatch(image returned), 从test_data对象中拿出一个batch（此时batch.size == 1）的测试pic
             if batch_idx % 100 == 0:
                 print("%d images done" % batch_idx)
-            im = databatch
+            im = databatch  # databatch里面存储1个img的像素信息
             # pnet
             t1 = 0
             if self.pnet_detector:
