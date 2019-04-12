@@ -16,9 +16,9 @@ class FcnDetector(object):
             self.height_op = tf.placeholder(tf.int32, name='image_height')  # 定义图像高
             image_reshape = tf.reshape(self.image_op, [1, self.height_op, self.width_op, 3])
 
-    
-            self.cls_prob, self.bbox_pred, _ = net_factory(image_reshape, training=False)  # 用传入的网络（P/R/O）计算分类，和detection结果
+            # 用传入的网络（P/R/O）计算分类，和detection结果
             # 根据传入的图片，生成预测，当输入是12 *12 *3时，输出bbox_pred是1 * 1 * 4, 当输入是692 * 512 * 3时，输出341 * 251 * 4
+            self.cls_prob, self.bbox_pred, _ = net_factory(image_reshape, training=False)
 
             #allow 采用GPU训练
             self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, gpu_options=tf.GPUOptions(allow_growth=True)))
