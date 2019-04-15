@@ -71,7 +71,7 @@ class MtcnnDetector(object):
         bbox_c[:, 0:4] = bbox_c[:, 0:4] + aug
         return bbox_c
 
-    def generate_bbox(self, cls_map, reg, scale, threshold):
+    def generate_bbox(self, cls_map, reg, scale, threshold):  # cls_map的shape是341*251
         """
             generate bbox from feature cls_map
         Parameters:
@@ -91,17 +91,18 @@ class MtcnnDetector(object):
         stride = 2        #stride = 4
         cellsize = 12     #cellsize = 25
 
-        t_index = np.where(cls_map > threshold)
-
+        t_index = np.where(cls_map > threshold)  # [0,1]>0.4的标记索引？，返回341*251这样的tuple中，大于0.4的元素索引
+                                                 # 总共有784个可能是人脸的区域。
         # find nothing
         if t_index[0].size == 0:
             return np.array([])
         #offset
-        dx1, dy1, dx2, dy2 = [reg[t_index[0], t_index[1], i] for i in range(4)]
+        dx1, dy1, dx2, dy2 = [reg[t_index[0], t_index[1], i] for i in range(4)]  # 根据候选的人脸区域，拿出对应的框框坐标。
 
         reg = np.array([dx1, dy1, dx2, dy2])
-        score = cls_map[t_index[0], t_index[1]]
-        boundingbox = np.vstack([np.round((stride * t_index[1]) / scale),
+        score = cls_map[t_index[0], t_index[1]]  # t_index[0]是所有可能是人脸的框框的0维坐标，
+                                                 # score根据坐标，把预测结果提取出来，shape为784 * 1
+        boundingbox = np.vstack([np.round((stride * t_index[1]) / scale),  # boundingbox前4列是每个box的索引 + 偏移？第5列是人脸预测可能性，后4列是可能的坐标
                                  np.round((stride * t_index[0]) / scale),
                                  np.round((stride * t_index[1] + cellsize) / scale),
                                  np.round((stride * t_index[0] + cellsize) / scale),
@@ -109,6 +110,9 @@ class MtcnnDetector(object):
                                  reg])
 
         return boundingbox.T
+
+
+
     #pre-process images
     def processed_image(self, img, scale):
         height, width, channels = img.shape
@@ -173,62 +177,43 @@ class MtcnnDetector(object):
         return return_list
     
     def detect_pnet(self, im):  # 计算1张图
-        """Get face candidates through pnet
-
-        Parameters:
-        ----------
-        im: numpy array
-            input image array
-
-        Returns:
-        -------
-        boxes: numpy array
-            detected boxes before calibration
-        boxes_c: numpy array
-            boxes after calibration
-        """
         h, w, c = im.shape
         net_size = 12
-        
         current_scale = float(net_size) / self.min_face_size  # find initial scale
-
         im_resized = self.processed_image(im, current_scale)   # 将img按照scale缩放，并将pixel做归1化处理
         current_height, current_width, _ = im_resized.shape
         # fcn
         all_boxes = list()
-        while min(current_height, current_width) > net_size:
-            #return the result predicted by pnet
-            #cls_cls_map : H*w*2
-            #reg: H*w*4
+        while min(current_height, current_width) > net_size: # 将输入图不停的做0.79的缩放，直到最小尺寸 > 12
             cls_cls_map, reg = self.pnet_detector.predict(im_resized)  # 用P_Net计算输入图片的cls和box结果
             #boxes: num*9(x1,y1,x2,y2,score,x1_offset,y1_offset,x2_offset,y2_offset)
-            boxes = self.generate_bbox(cls_cls_map[:, :,1], reg, current_scale, self.thresh[0])
-
-            current_scale *= self.scale_factor
-            im_resized = self.processed_image(im, current_scale)
-            current_height, current_width, _ = im_resized.shape
+            boxes = self.generate_bbox(cls_cls_map[:, :,1], reg, current_scale, self.thresh[0])  # 取1维， 即衡量one-hot编码是否接近真(0,1)的那一维参数。cls_cls_map的shape是341*251*2， reg的shape是341*251*2
+                                                                # boundingbox前4列是每个box的索引 + 偏移？第5列是人脸预测可能性，后4列是可能的坐标
+            current_scale *= self.scale_factor  # 缩放因子？
+            im_resized = self.processed_image(im, current_scale)  # 将image(1385, 1024, 3)，按照0.79的比例缩放
+            current_height, current_width, _ = im_resized.shape  # 将输入图不停的做0.79的缩放
 
             if boxes.size == 0:
                 continue
-            keep = py_nms(boxes[:, :5], 0.5, 'Union')
-            boxes = boxes[keep]
-            all_boxes.append(boxes)
-
+            keep = py_nms(boxes[:, :5], 0.5, 'Union')   # 抽0维全部，1维前5列元素
+                                                        # 选取概率最大的框框，舍去与最大概率重叠率高的框框，筛选出来239个框框
+            boxes = boxes[keep]  # keep为框框在781 * 9 里面的索引
+            all_boxes.append(boxes)  # 将1种尺寸的图片候选框集框加入集合，all_boxes[i], 循环16轮，但是第10轮以后，就没有新的box产生了。
         if len(all_boxes) == 0:
             return None, None, None
 
-        all_boxes = np.vstack(all_boxes)
+        all_boxes = np.vstack(all_boxes)  # 收集所有的869个框框
 
         # merge the detection from first stage
-        keep = py_nms(all_boxes[:, 0:5], 0.7, 'Union')
+        keep = py_nms(all_boxes[:, 0:5], 0.7, 'Union')  # 对这869个框框再进行nms筛选
         all_boxes = all_boxes[keep]
         boxes = all_boxes[:, :5]
 
-        bbw = all_boxes[:, 2] - all_boxes[:, 0] + 1
-        bbh = all_boxes[:, 3] - all_boxes[:, 1] + 1
+        bbw = all_boxes[:, 2] - all_boxes[:, 0] + 1  # 找到框框的宽
+        bbh = all_boxes[:, 3] - all_boxes[:, 1] + 1  # 找到框框的宽
 
         # refine the boxes
-        boxes_c = np.vstack([all_boxes[:, 0] + all_boxes[:, 5] * bbw,
+        boxes_c = np.vstack([all_boxes[:, 0] + all_boxes[:, 5] * bbw,  # boxes_c存放框框坐标和分类预测值
                              all_boxes[:, 1] + all_boxes[:, 6] * bbh,
                              all_boxes[:, 2] + all_boxes[:, 7] * bbw,
                              all_boxes[:, 3] + all_boxes[:, 8] * bbh,
