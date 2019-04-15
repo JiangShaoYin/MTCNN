@@ -32,7 +32,7 @@ def random_flip_images(image_batch,label_batch,landmark_batch):
         for i in flipindexes:
             cv2.flip(image_batch[i],1,image_batch[i])        
         
-        #pay attention: flip landmark    
+        #pay attention: flip landmark
         for i in fliplandmarkindexes:
             landmark_ = landmark_batch[i].reshape((-1,2))
             landmark_ = np.asarray([(1-x, y) for (x, y) in landmark_])

@@ -108,6 +108,7 @@ def landmark_ohem(landmark_pred, landmark_target, label):
     zeros = tf.zeros_like(label,dtype=tf.float32)
     valid_inds = tf.where(tf.equal(label,-2),ones,zeros)  # 将标签为-2的改为1，其他的都变成0
 
+    tf.nn.conv2d
     square_error = tf.square(landmark_pred - landmark_target) # 计算平方差
     square_error = tf.reduce_sum(square_error, axis=1)  # 计算损失，5个特征点与ground truth的之间坐标差值的平方
     num_valid = tf.reduce_sum(valid_inds)  # 统计1个batch里面， 有landmark信息的图片数量

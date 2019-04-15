@@ -71,25 +71,25 @@ class MtcnnDetector(object):
         bbox_c[:, 0:4] = bbox_c[:, 0:4] + aug
         return bbox_c
 
-    def generate_bbox(self, cls_map, bbox, scale, threshold):  # cls_map的shape是341*251
+    def generate_bbox(self, cls_map, reg, scale, threshold):  # cls_map的shape是341*251
         stride = 2        #stride = 4
         cellsize = 12     #cellsize = 25
         t_index = np.where(cls_map > threshold)  # [0,1]>0.4的标记索引，返回341*251这样的tuple中，大于0.4的元素索引
-                                                 # 总共有784个可能是人脸的区域。t_index对应的索引，即
+                                                 # 总共有784个可能是人脸的区域。
         # find nothing
         if t_index[0].size == 0:
             return np.array([])
-        dx1, dy1, dx2, dy2 = [bbox[t_index[0], t_index[1], i] for i in range(4)]  # 根据候选的人脸区域，拿出左上，和右下点相对于ground_truth左上，和右下的偏移距离 / crop框框的size
+        dx1, dy1, dx2, dy2 = [reg[t_index[0], t_index[1], i] for i in range(4)]  # 根据候选的人脸区域，拿出左上，和右下点相对于ground_truth左上，和右下的偏移距离 / crop框框的size
 
-        bbox = np.array([dx1, dy1, dx2, dy2])
+        reg = np.array([dx1, dy1, dx2, dy2])
         score = cls_map[t_index[0], t_index[1]]  # t_index[0]是所有可能是人脸的框框的0维坐标，score根据坐标，把预测结果提取出来，shape为784 * 1
-          # 当前框的坐标，相当于label，后面根据bbox的偏移值，计算出正确的框应该在图上哪个位置
-        boundingbox = np.vstack([np.round((stride * t_index[1]) / scale),  # stride是pool的步长， index[1]即为最后1道特征图上的坐标， index[1] * stride为原始图片缩放后，起点的x坐标
+
+        boundingbox = np.vstack([np.round((stride * t_index[1]) / scale),  # 左上角坐标
                                  np.round((stride * t_index[0]) / scale),  # boundingbox前4列是每个box的索引 + 偏移？第5列是人脸预测可能性，后4列是可能的坐标
-                                 np.round((stride * t_index[1] + cellsize) / scale),  # 核上的1个点，相当于原始图上的12个点
+                                 np.round((stride * t_index[1] + cellsize) / scale),
                                  np.round((stride * t_index[0] + cellsize) / scale),
                                  score,
-                                 bbox])  # bbox是前项传播的计算结果。
+                                 reg])
 
         return boundingbox.T
 
@@ -165,23 +165,21 @@ class MtcnnDetector(object):
         current_height, current_width, _ = im_resized.shape
 
         all_boxes = list()
-
         while min(current_height, current_width) > net_size: # 将输入图不停的做0.79的缩放，直到最小尺寸 > 12
-            cls_cls_map, bbox = self.pnet_detector.predict(im_resized)  # 用P_Net计算输入图片的cls和box结果
+            cls_cls_map, reg = self.pnet_detector.predict(im_resized)  # 用P_Net计算输入图片的cls和box结果
 
-            boxes = self.generate_bbox(cls_cls_map[:, :,1], bbox, current_scale, self.thresh[0])  # 取1维， 即衡量one-hot编码是否接近真(0,1)的那一维参数。cls_cls_map的shape是341*251*2， reg的shape是341*251*2
+            boxes = self.generate_bbox(cls_cls_map[:, :,1], reg, current_scale, self.thresh[0])  # 取1维， 即衡量one-hot编码是否接近真(0,1)的那一维参数。cls_cls_map的shape是341*251*2， reg的shape是341*251*2
                                                                                                  # boundingbox前4列是每个box的索引 + 偏移？第5列是人脸预测可能性，后4列是可能的坐标
-            current_scale *= self.scale_factor  # 缩放因子，0.79^i
-            im_resized = self.processed_image(im, current_scale)  # 将image(1385, 1024, 3)，按照0.79^i的比例缩放
+            current_scale *= self.scale_factor  # 缩放因子？
+            im_resized = self.processed_image(im, current_scale)  # 将image(1385, 1024, 3)，按照0.79的比例缩放
             current_height, current_width, _ = im_resized.shape  # 将输入图不停的做0.79的缩放
 
             if boxes.size == 0:
-                continue                                # boxes（781 * 9）
-            keep = py_nms(boxes[:, :5], 0.5, 'Union')   # 抽0维全部（781多行），1维前5列元素  0.5是与当前候选框重叠率之间的threshold，如果小于这个值，认为是另一个物体的分类框。
-                                                        # 选取概率最大的crop，舍去与最大概率重叠率高的crop，筛选出来239个框框
+                continue
+            keep = py_nms(boxes[:, :5], 0.5, 'Union')   # 抽0维全部，1维前5列元素
+                                                        # 选取概率最大的框框，舍去与最大概率重叠率高的框框，筛选出来239个框框
             boxes = boxes[keep]  # keep为框框在781 * 9 里面的索引
             all_boxes.append(boxes)  # 将1种尺寸的图片候选框集框加入集合，all_boxes[i], 循环16轮，但是第10轮以后，就没有新的box产生了。
-
         if len(all_boxes) == 0:
             return None, None, None
 
@@ -190,18 +188,18 @@ class MtcnnDetector(object):
         # merge the detection from first stage
         keep = py_nms(all_boxes[:, 0:5], 0.7, 'Union')  # 对这869个框框再进行nms筛选
         all_boxes = all_boxes[keep]
-        boxes = all_boxes[:, :5]  # 取box的前5维数据，这是截图框框的坐标
+        boxes = all_boxes[:, :5]
 
         bbw = all_boxes[:, 2] - all_boxes[:, 0] + 1  # 找到框框的宽
-        bbh = all_boxes[:, 3] - all_boxes[:, 1] + 1  # 找到框框的高
+        bbh = all_boxes[:, 3] - all_boxes[:, 1] + 1  # 找到框框的宽
 
         # refine the boxes
-        boxes_c = np.vstack([all_boxes[:, 0] + all_boxes[:, 5] * bbw,  # boxes_c存放预测的detection区域
+        boxes_c = np.vstack([all_boxes[:, 0] + all_boxes[:, 5] * bbw,  # boxes_c存放框框坐标和分类预测值
                              all_boxes[:, 1] + all_boxes[:, 6] * bbh,
                              all_boxes[:, 2] + all_boxes[:, 7] * bbw,
                              all_boxes[:, 3] + all_boxes[:, 8] * bbh,
-                             all_boxes[:, 4]])                         # boxes_c存放预测区域分类
-        boxes_c = boxes_c.T  # 数组转置(869, 5)变成(5, 869)
+                             all_boxes[:, 4]])
+        boxes_c = boxes_c.T
 
         return boxes, boxes_c, None
 
@@ -346,8 +344,8 @@ class MtcnnDetector(object):
             print(
                 "time cost " + '{:.3f}'.format(t1 + t2 + t3) + '  pnet {:.3f}  rnet {:.3f}  onet {:.3f}'.format(t1, t2,
                                                                                                                 t3))
+    
         return boxes_c,landmark
-
     def detect_face(self, test_data):
         all_boxes = []#save each image's bboxes
         landmarks = []
@@ -362,8 +360,8 @@ class MtcnnDetector(object):
             t1 = 0
             if self.pnet_detector:
                 t = time.time()
-                #ignore landmark  # boxes，
-                boxes, boxes_c, landmark = self.detect_pnet(im)  #
+                #ignore landmark 
+                boxes, boxes_c, landmark = self.detect_pnet(im)
                 t1 = time.time() - t
                 sum_time += t1
                 if boxes_c is None:

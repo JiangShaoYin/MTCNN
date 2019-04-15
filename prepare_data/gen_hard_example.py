@@ -161,7 +161,7 @@ def t_net(prefix, epoch,  # prefix保存模型文件路径
     # 注意是在“test”模式下，  imdb = IMDB("wider", image_set, root_path, dataset_path, 'test')，  gt_imdb = imdb.gt_imdb()
     test_data = TestLoader(data['images'])  # 生成输入图片的管理对象test_data
     #list
-    detections, _ = mtcnn_detector.detect_face(test_data)
+    detections, _ = mtcnn_detector.detect_face(test_data)  # 从test_data输入人脸pixel,返回detection和cls
 
     save_net = 'RNet'
     if test_mode == "PNet":
@@ -169,14 +169,14 @@ def t_net(prefix, epoch,  # prefix保存模型文件路径
     elif test_mode == "RNet":
         save_net = "ONet"
     #save detect result
-    save_path = os.path.join(data_dir, save_net)
+    save_path = os.path.join(data_dir, save_net)  # save_path == “24 / Rnet”
     print(save_path)
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
     save_file = os.path.join(save_path, "detections.pkl")
     with open(save_file, 'wb') as f:
-        pickle.dump(detections, f,1)
+        pickle.dump(detections, f,1)  # 将detection结果写入
     print("%s测试完成开始OHEM" % image_size)
     save_hard_example(image_size, data, save_path)
 
