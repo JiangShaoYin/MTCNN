@@ -51,16 +51,14 @@ def train(net_factory, prefix, end_epoch, base_dir, display=200, base_lr=0.01):
     print("Total datasets is: ", num)
     print(prefix)  # prefix == '../data/MTCNN_model/PNet_landmark/PNet'
 
-    #PNet use this method to get data
-    if net == 'PNet':
+    if net == 'PNet':      #PNet use this method to get data
         # dataset_dir = '../prepare_data/imglists/PNet\\train_PNet_landmark.tfrecord_shuffle'
         dataset_dir = os.path.join(base_dir,'train_%s_landmark.tfrecord_shuffle' % net)
         print(dataset_dir)
         # 一个batch == 4608， 从数据集中读取1个batch的pixel和，label
         image_batch, label_batch, bbox_batch,landmark_batch = read_single_tfrecord(dataset_dir, config.BATCH_SIZE, net)
-        
-    #RNet use 3 tfrecords to get data    
-    else:
+
+    else:      #R Net use 3 tfrecords to get data
         pos_dir = os.path.join(base_dir,'pos_landmark.tfrecord_shuffle')
         part_dir = os.path.join(base_dir,'part_landmark.tfrecord_shuffle')
         neg_dir = os.path.join(base_dir,'neg_landmark.tfrecord_shuffle')

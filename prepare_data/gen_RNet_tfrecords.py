@@ -29,12 +29,13 @@ def _add_to_tfrecord(filename, image_example, tfrecord_writer):
 
 def _get_output_filename(output_dir, name, net):
     #st = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    #return '%s/%s_%s_%s.tfrecord' % (output_dir, name, net, st)
+    #return '%s/%s_%s_%s.tfrecord' % (output_dir, name, net, st)  # imglists/RNet/
     #return '%s/train_PNet_landmark.tfrecord' % (output_dir)
-    # return '%s/landmark_landmark.tfrecord' % (output_dir)
+
+    return '%s/landmark_landmark.tfrecord' % (output_dir)
     # return '%s/neg_landmark.tfrecord' % (output_dir)
     # return '%s/pos_landmark.tfrecord' % (output_dir)
-    return '%s/part_landmark.tfrecord' % (output_dir)
+    #return '%s/part_landmark.tfrecord' % (output_dir)  # output_dir == imglists/RNet
     
 
 def run(dataset_dir, net, output_dir, name='MTCNN', shuffling=False):
@@ -51,12 +52,10 @@ def run(dataset_dir, net, output_dir, name='MTCNN', shuffling=False):
         print('Dataset files already exist. Exiting without re-creating them.')
         return
     # GET Dataset, and shuffling.
-    dataset = get_dataset(dataset_dir, net=net)
-    # filenames = dataset['filename']
-    if shuffling:
+    dataset = get_dataset(dataset_dir, net=net)   # dataset_dir == ".", net == 24
+    if shuffling:   # filenames = dataset['filename']
         tf_filename = tf_filename + '_shuffle'
-        #andom.seed(12345454)
-        random.shuffle(dataset)
+        random.shuffle(dataset)  #andom.seed(12345454)
     # Process dataset files.
     # write the data to tfrecord
     print ('lala')
@@ -75,10 +74,10 @@ def run(dataset_dir, net, output_dir, name='MTCNN', shuffling=False):
 def get_dataset(dir, net='PNet'):
     #item = 'imglists/PNet/train_%s_raw.txt' % net
     #item = 'imglists/PNet/train_%s_landmark.txt' % net
-    # item = '%s/landmark_%s_aug.txt' % (net,net)
-    # item = '%s/neg_%s.txt' % (net, net)
-    # item = '%s/pos_%s.txt' % (net, net)
-    item = '%s/part_%s.txt' % (net, net)
+    item = '%s/landmark_%s_aug.txt' % (net,net)
+    #item = '%s/neg_%s.txt' % (net, net)
+    #item = '%s/pos_%s.txt' % (net, net)
+    #item = '%s/part_%s.txt' % (net, net)
     print(item)
     dataset_dir = os.path.join(dir, item)
     imagelist = open(dataset_dir, 'r')
@@ -131,4 +130,5 @@ if __name__ == '__main__':
     dir = '.'
     net = '24'
     output_directory = 'imglists/RNet'
+    run(dir, net, output_directory, shuffling=True)
     run(dir, net, output_directory, shuffling=True)

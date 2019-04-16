@@ -101,10 +101,8 @@ def save_hard_example(net, data, save_path):   # load ground truth from annotati
     pos_file.close()
 
 
-def t_net(prefix, epoch,  # prefix保存模型文件路径
-             batch_size, test_mode="PNet",
-             thresh=[0.6, 0.6, 0.7], min_face_size=25,
-             stride=2, slide_window=False, shuffle=False, vis=False):
+def t_net(prefix, epoch,  batch_size, test_mode="PNet",  thresh=[0.6, 0.6, 0.7], min_face_size=25, # prefix保存模型文件路径
+          stride=2, slide_window=False, shuffle=False, vis=False):
     detectors = [None, None, None]
     print("Test model: ", test_mode)
     #PNet-echo
@@ -162,35 +160,25 @@ def t_net(prefix, epoch,  # prefix保存模型文件路径
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Test mtcnn',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--test_mode', dest='test_mode', help='test net type, can be pnet, rnet or onet',
-                        default='PNet', type=str)
+    parser = argparse.ArgumentParser(description='Test mtcnn', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--test_mode', dest='test_mode', help='test net type, can be pnet, rnet or onet', default='PNet', type=str)  # 添加参数，默认是PNET
+
     parser.add_argument('--prefix', dest='prefix', help='prefix of model name', nargs="+",
                         default=['../data/MTCNN_model/PNet_landmark/PNet', '../data/MTCNN_model/RNet_landmark/RNet', '../data/MTCNN_model/ONet/ONet'],
                         type=str)
-    parser.add_argument('--epoch', dest='epoch', help='epoch number of model to load', nargs="+",
-                        # default=[18, 14, 22], type=int)
+    parser.add_argument('--epoch', dest='epoch', help='epoch number of model to load', nargs="+",  # default=[18, 14, 22], type=int)
                         default=[16, 6, 22], type=int)
-    parser.add_argument('--batch_size', dest='batch_size', help='list of batch size used in prediction', nargs="+",
-                        default=[2048, 256, 16], type=int)
-    parser.add_argument('--thresh', dest='thresh', help='list of thresh for pnet, rnet, onet', nargs="+",
-                        default=[0.4, 0.05, 0.7], type=float)
-    parser.add_argument('--min_face', dest='min_face', help='minimum face size for detection',
-                        default=24, type=int)
-    parser.add_argument('--stride', dest='stride', help='stride of sliding window',
-                        default=2, type=int)
+    parser.add_argument('--batch_size', dest='batch_size', help='list of batch size used in prediction', nargs="+", default=[2048, 256, 16], type=int)
+    parser.add_argument('--thresh', dest='thresh', help='list of thresh for pnet, rnet, onet', nargs="+", default=[0.4, 0.05, 0.7], type=float)
+    parser.add_argument('--min_face', dest='min_face', help='minimum face size for detection', default=24, type=int)
+    parser.add_argument('--stride', dest='stride', help='stride of sliding window', default=2, type=int)
     parser.add_argument('--sw', dest='slide_window', help='use sliding window in pnet', action='store_true')
-    # parser.add_argument('--gpu', dest='gpu_id', help='GPU device to train with',
-    #                     default=0, type=int)
-    parser.add_argument('--shuffle', dest='shuffle', help='shuffle data on visualization', action='store_true')
-    # parser.add_argument('--vis', dest='vis', help='turn on visualization', action='store_true')
-    args = parser.parse_args()
+    parser.add_argument('--shuffle', dest='shuffle', help='shuffle data on visualization', action='store_true')   # parser.add_argument('--gpu', dest='gpu_id', help='GPU device to train with', default=0, type=int)
+    args = parser.parse_args()    # parser.add_argument('--vis', dest='vis', help='turn on visualization', action='store_true')
     return args
 
 
 if __name__ == '__main__':
-
     net = 'RNet'
     if net == "RNet":
         image_size = 24
@@ -203,8 +191,8 @@ if __name__ == '__main__':
     neg_dir = get_path(data_dir, 'negative')
     pos_dir = get_path(data_dir, 'positive')
     part_dir = get_path(data_dir, 'part')
-    #create dictionary shuffle   
-    for dir_path in [neg_dir, pos_dir, part_dir]:
+
+    for dir_path in [neg_dir, pos_dir, part_dir]:      # create dictionary shuffle
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
 
@@ -212,13 +200,13 @@ if __name__ == '__main__':
 
     print('Called with argument:')
     print(args)
-    t_net(args.prefix,#model param's file
-          args.epoch, #final epoches
-          args.batch_size, #test batch_size 
-          args.test_mode,#test which model
-          args.thresh, #cls threshold
-          args.min_face, #min_face
-          args.stride,#stride
+    t_net(args.prefix,# model param's file
+          args.epoch, # final epoches
+          args.batch_size, # test batch_size
+          args.test_mode,# test which model       # 传入要测试的网络
+          args.thresh, # cls threshold
+          args.min_face, # min_face
+          args.stride,# stride
           args.slide_window, 
           args.shuffle, 
           vis=False)
