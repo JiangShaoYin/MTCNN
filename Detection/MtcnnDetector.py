@@ -195,9 +195,9 @@ class MtcnnDetector(object):
             reg = reg[keep_inds]  # 本层网络的预测区域
         else:
             return None, None, None
-        keep = py_nms(boxes, 0.6)
-        boxes = boxes[keep]
-        boxes_c = self.calibrate_box(boxes, reg[keep])
+        keep = py_nms(boxes, 0.6)  # 对上一层detection，经过本次计算，筛选后的框框，做非极大值抑制，阈值0.6
+        boxes = boxes[keep]  # 提取框框
+        boxes_c = self.calibrate_box(boxes, reg[keep])  # 进行偏移计算。
         return boxes, boxes_c, None
 
     def detect_onet(self, im, dets):
@@ -212,7 +212,7 @@ class MtcnnDetector(object):
             tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]
             cropped_ims[i, :, :, :] = (cv2.resize(tmp, (48, 48))-127.5) / 128
             
-        cls_scores, reg,landmark = self.onet_detector.predict(cropped_ims)
+        cls_scores, reg, landmark = self.onet_detector.predict(cropped_ims)  # 计算cls， dec ，和landmark
         #prob belongs to face
         cls_scores = cls_scores[:,1]        
         keep_inds = np.where(cls_scores > self.thresh[2])[0]        
@@ -235,6 +235,7 @@ class MtcnnDetector(object):
         boxes_c = boxes_c[keep]
         landmark = landmark[keep]
         return boxes, boxes_c,landmark
+
     #use for video
     def detect(self, img):
         """Detect face over image
