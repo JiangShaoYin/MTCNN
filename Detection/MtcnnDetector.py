@@ -371,8 +371,8 @@ class MtcnnDetector(object):
 
                     landmarks.append(np.array([]))     # pay attention
                     batch_idx += 1
-                    #continue
-                    break
+                    continue
+
             # rnet
             t2 = 0
             if self.rnet_detector:

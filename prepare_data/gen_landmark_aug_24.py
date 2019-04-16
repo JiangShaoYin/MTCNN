@@ -57,12 +57,11 @@ def GenerateData(ftxt, output,net,argument=False):
         return
     image_id = 0
     f = open(join(OUTPUT,"landmark_%s_aug.txt" %(size)),'w')
-    data = getDataFromTxt(ftxt)
+    data = getDataFromTxt(ftxt)   # ftxt == prepare_data/trainImageList.txt， 存储有lfw_5590内保存的landmark信息
     idx = 0
-    #image_path bbox landmark(5*2)
-    for (imgPath, bbox, landmarkGt) in data:
-        #print imgPath
-        F_imgs = []
+
+    for (imgPath, bbox, landmarkGt) in data:  # 一条data记录：lfw_5590\Aaron_Eckhart_0001.jpg 84 161 92 169 106.25 107.75 146.75 112.25 125.25 142.75 105.25 157.75 139.75 161.75
+        F_imgs = []      #print imgPath
         F_landmarks = []        
         img = cv2.imread(imgPath)
         assert(img is not None)
@@ -156,8 +155,7 @@ def GenerateData(ftxt, output,net,argument=False):
                         F_landmarks.append(landmark_flipped.reshape(10)) 
                     
             F_imgs, F_landmarks = np.asarray(F_imgs), np.asarray(F_landmarks)
-            #print F_imgs.shape
-            #print F_landmarks.shape
+
             for i in range(len(F_imgs)):
                 print(image_id)
 
@@ -182,10 +180,8 @@ def GenerateData(ftxt, output,net,argument=False):
 
 
 if __name__ == '__main__':
-    # train data
-    net = "RNet"
-    #train_txt = "train.txt"
-    train_txt = "trainImageList.txt"
+    net = "RNet"     # train data
+    train_txt = "trainImageList.txt"      # prepare_data/trainImageList.txt存储有lfw_5590内保存的landmark信息
     imgs,landmarks = GenerateData(train_txt, OUTPUT,net,argument=True)
     
    

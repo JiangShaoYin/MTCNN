@@ -15,43 +15,36 @@ from Detection.fcn_detector import FcnDetector
 from Detection.MtcnnDetector import MtcnnDetector
 from utils import *
 from data_utils import *
-#net : 24(RNet)/48(ONet)
-#data: dict()
-def save_hard_example(net, data, save_path):
-    # load ground truth from annotation file. format of each line: image/path [x1,y1,x2,y2] for each gt_box in this image
 
-    im_idx_list = data['images']
-    # print(images[0])
-    gt_boxes_list = data['bboxes']  # 真实的box值
-    num_of_images = len(im_idx_list)
+def save_hard_example(net, data, save_path):   # load ground truth from annotation file. format of each line: image/path [x1,y1,x2,y2] for each gt_box in this image
+    im_idx_list = data['images']        # data保存WIDER_train里面所有的image，读pic的文件名，和box的ground truth值，
+    gt_boxes_list = data['bboxes']      # data['images']==all image pathes
+                                        # data['bboxes'] =all image bboxes（4列）
 
+    num_of_images = len(im_idx_list)  # 12880
     print("processing %d images in total" % num_of_images)
 
-    neg_label_file = "%d/neg_%d.txt" % (net, image_size)     # save files
-    neg_file = open(neg_label_file, 'w')
-
+    neg_label_file = "%d/neg_%d.txt" % (net, image_size)     # neg_label_file == '24/neg_24.txt'
+    neg_file = open(neg_label_file, 'w')                     # 打开保存pos， neg， part的文件夹
     pos_label_file = "%d/pos_%d.txt" % (net, image_size)
     pos_file = open(pos_label_file, 'w')
-
     part_label_file = "%d/part_%d.txt" % (net, image_size)
     part_file = open(part_label_file, 'w')
 
-    det_boxes = pickle.load(open(os.path.join(save_path, 'detections.pkl'), 'rb')) # read detect result
+    det_boxes = pickle.load(open(os.path.join(save_path, 'detections.pkl'), 'rb')) # 从pkl里面读取检测框信息（5列）
+    print (len(det_boxes))      # 测试用的10
+    print (num_of_images)       # 12880
+ #   assert len(det_boxes) == num_of_images # len(det_boxes) == num_of_images应该为TRUE，如果不是，则返回错误。"incorrect detections or ground truths"
 
-    print (len(det_boxes))      # print(len(det_boxes), num_of_images)
-    print (num_of_images)
-    assert len(det_boxes) == num_of_images, "incorrect detections or ground truths"
-
-    # index of neg, pos and part face, used as their image names
-    n_idx = 0
+    n_idx = 0  # index of neg, pos and part face, used as their image names
     p_idx = 0
     d_idx = 0
     image_done = 0
     #im_idx_list image index(list)
     #det_boxes detect result(list)
     #gt_boxes_list gt(list)
-    for im_idx, dets, gts in zip(im_idx_list, det_boxes, gt_boxes_list):
-        gts = np.array(gts, dtype=np.float32).reshape(-1, 4)
+    for im_idx, dets, gts in zip(im_idx_list, det_boxes, gt_boxes_list): # im_idx保存1张图片名， dets保存1张图片过P_NET生成的800+框框
+        gts = np.array(gts, dtype=np.float32).reshape(-1, 4)             # gts保存txt里面的存储的label
         if image_done % 100 == 0:
             print("%d images done" % image_done)
         image_done += 1
@@ -59,52 +52,41 @@ def save_hard_example(net, data, save_path):
         if dets.shape[0] == 0:
             continue
         img = cv2.imread(im_idx)
-        #change to square
-        dets = convert_to_square(dets)
-        dets[:, 0:4] = np.round(dets[:, 0:4])
+
+        dets = convert_to_square(dets)       # 通过偏移左上角，把框框变成正方形
+        dets[:, 0:4] = np.round(dets[:, 0:4])  # 取出detections的前4维信息
         neg_num = 0
-        for box in dets:
+        for box in dets: # 遍历detections的前4维信息
             x_left, y_top, x_right, y_bottom, _ = box.astype(int)
             width = x_right - x_left + 1
             height = y_bottom - y_top + 1
 
-            # ignore box that is too small or beyond image border
-            if width < 20 or x_left < 0 or y_top < 0 or x_right > img.shape[1] - 1 or y_bottom > img.shape[0] - 1:
+            if width < 20 or x_left < 0 or y_top < 0 or x_right > img.shape[1] - 1 or y_bottom > img.shape[0] - 1: # 去掉过小，或者超出边界的框框
                 continue
 
-            # compute intersection over union(IoU) between current box and all gt boxes
-            Iou = IoU(box, gts)
-            cropped_im = img[y_top:y_bottom + 1, x_left:x_right + 1, :]
-            resized_im = cv2.resize(cropped_im, (image_size, image_size),
-                                    interpolation=cv2.INTER_LINEAR)
+            Iou = IoU(box, gts)      # compute intersection over union(IoU) between current box and all gt boxes
+            cropped_im = img[y_top:y_bottom + 1, x_left:x_right + 1, :]  # 拿到检测框
+            resized_im = cv2.resize(cropped_im, (image_size, image_size), interpolation=cv2.INTER_LINEAR)
 
-            # save negative images and write label
-            # Iou with all gts must below 0.3            
-            if np.max(Iou) < 0.3 and neg_num < 60:
-                #save the examples
-                save_file = get_path(neg_dir, "%s.jpg" % n_idx)
-                # print(save_file)
+            if np.max(Iou) < 0.3 and neg_num < 60:   # save negative images and write label，Iou with all gts must below 0.3
+                save_file = get_path(neg_dir, "%s.jpg" % n_idx)  # save the examples，'24/negative/0.jpg'
                 neg_file.write(save_file + ' 0\n')
                 cv2.imwrite(save_file, resized_im)
                 n_idx += 1
                 neg_num += 1
             else:
-                # find gt_box with the highest iou
-                idx = np.argmax(Iou)
+                idx = np.argmax(Iou)  # find gt_box with the highest iou,找正例
                 assigned_gt = gts[idx]
                 x1, y1, x2, y2 = assigned_gt
 
-                # compute bbox reg label
-                offset_x1 = (x1 - x_left) / float(width)
+                offset_x1 = (x1 - x_left) / float(width)  # compute bbox reg label计算偏移，x1是label值
                 offset_y1 = (y1 - y_top) / float(height)
                 offset_x2 = (x2 - x_right) / float(width)
                 offset_y2 = (y2 - y_bottom) / float(height)
 
-                # save positive and part-face images and write labels
-                if np.max(Iou) >= 0.65:
+                if np.max(Iou) >= 0.65:  # save positive and part-face images and write labels
                     save_file = get_path(pos_dir, "%s.jpg" % p_idx)
-                    pos_file.write(save_file + ' 1 %.2f %.2f %.2f %.2f\n' % (
-                        offset_x1, offset_y1, offset_x2, offset_y2))
+                    pos_file.write(save_file + ' 1 %.2f %.2f %.2f %.2f\n' % (offset_x1, offset_y1, offset_x2, offset_y2))
                     cv2.imwrite(save_file, resized_im)
                     p_idx += 1
 
@@ -174,7 +156,9 @@ def t_net(prefix, epoch,  # prefix保存模型文件路径
     with open(save_file, 'wb') as f:  # save_file == detections.pkl
         pickle.dump(detections, f,1)  # 将detection结果写入文件
     print("%s测试完成开始OHEM" % image_size)
-    save_hard_example(image_size, data, save_path)
+    save_hard_example(image_size, data, save_path)     # data，读pic的文件名，和box的ground truth值，
+                                                       # data['images']==all image pathes
+                                                       # data['bboxes'] =all image bboxes（4列）
 
 
 def parse_args():
