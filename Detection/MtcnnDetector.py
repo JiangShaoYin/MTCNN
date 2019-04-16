@@ -100,21 +100,21 @@ class MtcnnDetector(object):
         img_resized = (img_resized - 127.5) / 128  # pixel数值做归1化处理
         return img_resized
 
-    def pad(self, bboxes, w, h):  #
-        tmpw, tmph = bboxes[:, 2] - bboxes[:, 0] + 1, bboxes[:, 3] - bboxes[:, 1] + 1
+    def pad(self, bboxes, w, h):  # w, h是原始图片的宽， 高，bboxes是上一层网络计算出来的框框绝对坐标
+        detc_w, detc_h = bboxes[:, 2] - bboxes[:, 0] + 1, bboxes[:, 3] - bboxes[:, 1] + 1  # 检测出来的框框们的宽tmpw，和高tmph
         num_box = bboxes.shape[0]
 
-        dx, dy = np.zeros((num_box,)), np.zeros((num_box,))
-        edx, edy = tmpw.copy() - 1, tmph.copy() - 1
+        dx, dy = np.zeros((num_box,)), np.zeros((num_box,))  #
+        edx, edy = detc_w.copy() - 1, detc_h.copy() - 1
 
-        x, y, ex, ey = bboxes[:, 0], bboxes[:, 1], bboxes[:, 2], bboxes[:, 3]
+        x, y, ex, ey = bboxes[:, 0], bboxes[:, 1], bboxes[:, 2], bboxes[:, 3]  # 上一层网络计算出来的框框绝对坐标
 
         tmp_index = np.where(ex > w - 1)
-        edx[tmp_index] = tmpw[tmp_index] + w - 2 - ex[tmp_index]
+        edx[tmp_index] = detc_w[tmp_index] + w - 2 - ex[tmp_index]
         ex[tmp_index] = w - 1
 
         tmp_index = np.where(ey > h - 1)
-        edy[tmp_index] = tmph[tmp_index] + h - 2 - ey[tmp_index]
+        edy[tmp_index] = detc_h[tmp_index] + h - 2 - ey[tmp_index]
         ey[tmp_index] = h - 1
 
         tmp_index = np.where(x < 0)
@@ -125,7 +125,7 @@ class MtcnnDetector(object):
         dy[tmp_index] = 0 - y[tmp_index]
         y[tmp_index] = 0
 
-        return_list = [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph]
+        return_list = [dy, edy, dx, edx, y, ey, x, ex, detc_w, detc_h]
         return_list = [item.astype(np.int32) for item in return_list]
 
         return return_list
@@ -140,21 +140,18 @@ class MtcnnDetector(object):
 
         while min(current_height, current_width) > net_size: # 将输入图不停的做0.79^i的缩放，直到最小尺寸 > 12
             cls_cls_map, bbox = self.pnet_detector.predict(im_resized)  # 用P_Net计算输入图片的cls和box结果
-
-            boxes = self.generate_bbox(cls_cls_map[:, :,1], bbox, current_scale, self.thresh[0])  # 取1维， 即衡量one-hot编码是否接近真(0,1)的那一维参数。cls_cls_map的shape是341*251*2， reg的shape是341*251*2，
+            boxes = self.generate_bbox(cls_cls_map[:, :,1], bbox, current_scale, self.thresh[0])  # 将 > thresh对应的位置的预测detection框框计算后， 提取出来，cls_cls_map的shape是341*251*2， reg的shape是341*251*2，
                                                                                                   # 根据预测bbox的offset，将预测的人脸框坐标提取出来。
-            if boxes.size == 0:
-                continue                                # boxes（781 * 9）
-            keep = py_nms(boxes[:, :5], 0.5, 'Union')   # 抽0维全部（781多行），1维前5列元素  0.5是与当前候选框重叠率之间的threshold，如果小于这个值，认为是另一个物体的分类框。
-                                                        # 选取概率最大的crop，舍去与最大概率重叠率高的crop，筛选出来239个框框
-            boxes = boxes[keep]                         # keep为框框在781 * 9 里面的索引
-            all_boxes.append(boxes)                     # 将1种尺寸的图片候选框集框加入集合，all_boxes[i], 循环16轮，但是第10轮以后，就没有新的box产生了， boundingbox前4列是每个box的crop框框， 第5列是人脸预测可能性，后4列是预测的offset
-
             # 缩放单元
             current_scale *= self.scale_factor  # 缩放因子，0.79^i
             im_resized = self.processed_image(im, current_scale)  # 将image(1385, 1024, 3)，按照0.79^i的比例缩放
             current_height, current_width, _ = im_resized.shape  # 将输入图不停的做0.79的缩放
 
+            if boxes.size == 0:
+                continue                                # boxes（781 * 9）
+            keep = py_nms(boxes[:, :5], 0.5, 'Union')   # 抽0维全部（781多行），1维前5列元素  0.5是与当前候选框重叠率之间的threshold，如果小于这个值，认为是另一个物体的分类框。选取概率最大的crop，舍去与最大概率重叠率高的crop，筛选出来239个框框
+            boxes = boxes[keep]                         # keep为框框在781 * 9 里面的索引
+            all_boxes.append(boxes)                     # 将1种尺寸的图片候选框集框加入集合，all_boxes[i], 循环16轮，但是第10轮以后，就没有新的box产生了， boundingbox前4列是每个box的crop框框， 第5列是人脸预测可能性，后4列是预测的offset
         if len(all_boxes) == 0:
             return None, None, None
 
@@ -181,27 +178,27 @@ class MtcnnDetector(object):
         dets = self.convert_to_square(dets)
         dets[:, 0:4] = np.round(dets[:, 0:4])
 
-        [dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph] = self.pad(dets, w, h)
+        [dy, edy, dx, edx, y, ey, x, ex, det_w, det_h] = self.pad(dets, w, h)  #
         num_boxes = dets.shape[0]
-        cropped_ims = np.zeros((num_boxes, 24, 24, 3), dtype=np.float32)
+        cropped_ims = np.zeros((num_boxes, 24, 24, 3), dtype=np.float32)  # p_net生成的18个框框，
         for i in range(num_boxes):
-            tmp = np.zeros((tmph[i], tmpw[i], 3), dtype=np.uint8)
-            tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]
-            cropped_ims[i, :, :, :] = (cv2.resize(tmp, (24, 24))-127.5) / 128
+            tmp = np.zeros((det_h[i], det_w[i], 3), dtype=np.uint8)  # 生成检测窗口
+            tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]  # 将im中y框框中的像素点，复制到tmp图片的dy框框
+            cropped_ims[i, :, :, :] = (cv2.resize(tmp, (24, 24))-127.5) / 128  # 将18张图片resize到24 * 24，然后做归1化处理
 
-        cls_scores, reg, _ = self.rnet_detector.predict(cropped_ims)  # 用R_net预测
+        cls_scores, reg, _ = self.rnet_detector.predict(cropped_ims)  # 用R_net预测cls，和detection
         cls_scores = cls_scores[:,1]
-        keep_inds = np.where(cls_scores > self.thresh[1])[0]
+        keep_inds = np.where(cls_scores > self.thresh[1])[0]  # 喂入的18个图片是人脸区域的可能性 > thresh[1]的索引号取出来
         if len(keep_inds) > 0:
-            boxes = dets[keep_inds]
+            boxes = dets[keep_inds]  # 上一层网络的预测区域
             boxes[:, 4] = cls_scores[keep_inds]
-            reg = reg[keep_inds]
+            reg = reg[keep_inds]  # 本层网络的预测区域
         else:
             return None, None, None
         keep = py_nms(boxes, 0.6)
         boxes = boxes[keep]
         boxes_c = self.calibrate_box(boxes, reg[keep])
-        return boxes, boxes_c,None
+        return boxes, boxes_c, None
 
     def detect_onet(self, im, dets):
         h, w, c = im.shape

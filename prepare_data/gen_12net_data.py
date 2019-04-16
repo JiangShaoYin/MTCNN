@@ -45,7 +45,8 @@ for annotation in annotations:
     img = cv2.imread(os.path.join(im_dir, im_path + '.jpg'))  # 'WIDER_train/images       0--Parade/0_Parade_marchingband_1_849                   .jpg'
     idx += 1  # 记录已读图片的张数
     if idx % 100 == 0:
-        print(idx, "images done")
+        print(idx, "i"
+                   "mages done")
         
     height, width, channel = img.shape
 
