@@ -46,10 +46,10 @@ def cls_ohem(cls_prob, label):  # online hard example mining
     valid_inds = tf.where(label < zeros, zeros, ones)   # valid_inds = label的二值化处理，<0 置为0，>0 置为1
 
     num_valid = tf.reduce_sum(valid_inds)  # 元素个数
-    keep_num = tf.cast(num_valid * num_keep_radio, dtype=tf.int32)  # 只保留最大的前70%的数据
-    #set 0 to invalid sample
+    keep_num = tf.cast(num_valid * num_keep_radio, dtype=tf.int32)  # num_keep_radio == 0.7，只保留loss最大的前70%的数据
+
     loss = loss * valid_inds  # loss = -tf.log(label_prob+1e-10)，逐位相乘，保持维度不变，loss值记录计算结果， 与label结果的相似度，值越大，判断结果与label距离越远
-    loss, _ = tf.nn.top_k(loss, k=keep_num)  # 取出最大的前k个loss
+    loss, _ = tf.nn.top_k(loss, k=keep_num)  # 取出最大的前k个loss（只对前70%的样本，求梯度，减少计算量）
     return tf.reduce_mean(loss)
 
 
@@ -92,8 +92,8 @@ def bbox_ohem(bbox_pred, bbox_target, label):  # bbox经过shuffle，是4维度�
     # (batch,)batchsize
     square_error = tf.square(bbox_pred-bbox_target)  # 与标签差值的平方，为什么计算结果shape为(4806,2)
     square_error = tf.reduce_sum(square_error, axis=1)  # 对1维求和，计算后square_error = (4806, )
-    # num_valid == 数据集中pos和part图片的数量
-    num_valid = tf.reduce_sum(valid_inds)
+
+    num_valid = tf.reduce_sum(valid_inds)      # num_valid == 数据集中pos和part图片的数量
     keep_num = tf.cast(num_valid, dtype=tf.int32)  # 将num_valid转为int型
 
     #keep valid index square_error
