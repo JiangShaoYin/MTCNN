@@ -86,7 +86,7 @@ class MtcnnDetector(object):
           # 当前框的坐标，相当于label，后面根据bbox的偏移值，计算出正确的框应该在图上哪个位置
         boundingbox = np.vstack([np.round((stride * t_index[1]) / scale),  # stride是pool的步长， index[1]即为最后1道特征图上的坐标， index[1] * stride为原始图片缩放后，起点的x坐标
                                  np.round((stride * t_index[0]) / scale),  # boundingbox前4列是每个box的索引 + 偏移？第5列是人脸预测可能性，后4列是可能的坐标
-                                 np.round((stride * t_index[1] + cellsize) / scale),  # 核上的1个点，相当于原始图上的12个点
+                                 np.round((stride * t_index[1] + cellsize) / scale),  # 核上的1个点感受野是12
                                  np.round((stride * t_index[0] + cellsize) / scale),
                                  score,
                                  bbox])  # bbox是前项传播的计算结果。
@@ -196,7 +196,7 @@ class MtcnnDetector(object):
         bbh = all_boxes[:, 3] - all_boxes[:, 1] + 1  # 找到框框的高
 
         # refine the boxes
-        boxes_c = np.vstack([all_boxes[:, 0] + all_boxes[:, 5] * bbw,  # boxes_c存放预测的detection区域
+        boxes_c = np.vstack([all_boxes[:, 0] + all_boxes[:, 5] * bbw,  # boxes_c存放calibrate后，预测的detection区域
                              all_boxes[:, 1] + all_boxes[:, 6] * bbh,
                              all_boxes[:, 2] + all_boxes[:, 7] * bbw,
                              all_boxes[:, 3] + all_boxes[:, 8] * bbh,
@@ -320,7 +320,6 @@ class MtcnnDetector(object):
             boxes, boxes_c,_ = self.detect_pnet(img)
             if boxes_c is None:
                 return np.array([]),np.array([])
-    
             t1 = time.time() - t
             t = time.time()
     
@@ -355,7 +354,7 @@ class MtcnnDetector(object):
         sum_time = 0
         #test_data is iter_
         for databatch in test_data:  # databatch(image returned), 从test_data对象中拿出一个batch（此时batch.size == 1）的测试pic
-            if batch_idx % 100 == 0:
+            if batch_idx % 1 == 0:
                 print("%d images done" % batch_idx)
             im = databatch  # databatch里面存储1个img的像素信息
             # pnet
@@ -363,16 +362,17 @@ class MtcnnDetector(object):
             if self.pnet_detector:
                 t = time.time()
                 #ignore landmark  # boxes，
-                boxes, boxes_c, landmark = self.detect_pnet(im)  #
+                boxes, boxes_c, landmark = self.detect_pnet(im)  # boxes是原始的截图框， boxes_c是calibrate offset后的框框
                 t1 = time.time() - t
                 sum_time += t1
                 if boxes_c is None:
                     print("boxes_c is None...")
                     all_boxes.append(np.array([]))
-                    #pay attention
-                    landmarks.append(np.array([]))
+
+                    landmarks.append(np.array([]))     # pay attention
                     batch_idx += 1
-                    continue
+                    #continue
+                    break
             # rnet
             t2 = 0
             if self.rnet_detector:
@@ -402,9 +402,8 @@ class MtcnnDetector(object):
                     "time cost " + '{:.3f}'.format(sum_time) + '  pnet {:.3f}  rnet {:.3f}  onet {:.3f}'.format(t1, t2,t3))
                                                                                                                     
                                                                                                                    
-            all_boxes.append(boxes_c)
+            all_boxes.append(boxes_c)  #
             landmarks.append(landmark)
             batch_idx += 1
-        #num_of_data*9,num_of_data*10
-        return all_boxes,landmarks
+        return all_boxes,landmarks      # num_of_data * 9,num_of_data * 10
 

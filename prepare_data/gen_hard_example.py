@@ -17,20 +17,17 @@ from utils import *
 from data_utils import *
 #net : 24(RNet)/48(ONet)
 #data: dict()
-def save_hard_example(net, data,save_path):
-    # load ground truth from annotation file
-    # format of each line: image/path [x1,y1,x2,y2] for each gt_box in this image
+def save_hard_example(net, data, save_path):
+    # load ground truth from annotation file. format of each line: image/path [x1,y1,x2,y2] for each gt_box in this image
 
     im_idx_list = data['images']
     # print(images[0])
-    gt_boxes_list = data['bboxes']
+    gt_boxes_list = data['bboxes']  # 真实的box值
     num_of_images = len(im_idx_list)
 
     print("processing %d images in total" % num_of_images)
 
-    
-    # save files
-    neg_label_file = "%d/neg_%d.txt" % (net, image_size)
+    neg_label_file = "%d/neg_%d.txt" % (net, image_size)     # save files
     neg_file = open(neg_label_file, 'w')
 
     pos_label_file = "%d/pos_%d.txt" % (net, image_size)
@@ -38,10 +35,10 @@ def save_hard_example(net, data,save_path):
 
     part_label_file = "%d/part_%d.txt" % (net, image_size)
     part_file = open(part_label_file, 'w')
-    #read detect result
-    det_boxes = pickle.load(open(os.path.join(save_path, 'detections.pkl'), 'rb'))
-    # print(len(det_boxes), num_of_images)
-    print (len(det_boxes))
+
+    det_boxes = pickle.load(open(os.path.join(save_path, 'detections.pkl'), 'rb')) # read detect result
+
+    print (len(det_boxes))      # print(len(det_boxes), num_of_images)
     print (num_of_images)
     assert len(det_boxes) == num_of_images, "incorrect detections or ground truths"
 
@@ -155,8 +152,7 @@ def t_net(prefix, epoch,  # prefix保存模型文件路径
     #read annatation(type:dict)
     data = read_annotation(basedir, filename)  # 读pic的文件名，和box的ground truth值，data['images']==all image pathes
                                                                                     #  data['bboxes'] =all image bboxes
-    mtcnn_detector = MtcnnDetector(detectors=detectors, min_face_size=min_face_size,
-                                   stride=stride, threshold=thresh, slide_window=slide_window)
+    mtcnn_detector = MtcnnDetector(detectors=detectors, min_face_size=min_face_size, stride=stride, threshold=thresh, slide_window=slide_window)
     print("==================================")
     # 注意是在“test”模式下，  imdb = IMDB("wider", image_set, root_path, dataset_path, 'test')，  gt_imdb = imdb.gt_imdb()
     test_data = TestLoader(data['images'])  # 生成输入图片的管理对象test_data
@@ -175,8 +171,8 @@ def t_net(prefix, epoch,  # prefix保存模型文件路径
         os.mkdir(save_path)
 
     save_file = os.path.join(save_path, "detections.pkl")
-    with open(save_file, 'wb') as f:
-        pickle.dump(detections, f,1)  # 将detection结果写入
+    with open(save_file, 'wb') as f:  # save_file == detections.pkl
+        pickle.dump(detections, f,1)  # 将detection结果写入文件
     print("%s测试完成开始OHEM" % image_size)
     save_hard_example(image_size, data, save_path)
 
