@@ -9,6 +9,7 @@ from prepare_data.loader import TestLoader
 import cv2
 import os
 import numpy as np
+
 test_mode = "ONet"
 thresh = [0.9, 0.6, 0.7]
 min_face_size = 24
@@ -17,24 +18,21 @@ slide_window = False
 shuffle = False
 detectors = [None, None, None]
 prefix = ['../data/MTCNN_model/PNet_landmark/PNet', '../data/MTCNN_model/RNet_landmark/RNet', '../data/MTCNN_model/ONet_landmark/ONet']
-# epoch = [18, 14, 16]
-epoch = [16, 6, 22]
+epoch = [16, 6, 22]  # epoch = [18, 14, 16]
 batch_size = [2048, 256, 16]
 model_path = ['%s-%s' % (x, y) for x, y in zip(prefix, epoch)]
-# load pnet model
-if slide_window:
+
+if slide_window:  # load pnet model
     PNet = Detector(P_Net, 12, batch_size[0], model_path[0])
 else:
     PNet = FcnDetector(P_Net, model_path[0])
 detectors[0] = PNet
 
-# load rnet model
-if test_mode in ["RNet", "ONet"]:
+if test_mode in ["RNet", "ONet"]:  # load rnet model
     RNet = Detector(R_Net, 24, batch_size[1], model_path[1])
     detectors[1] = RNet
 
-# load onet model
-if test_mode == "ONet":
+if test_mode == "ONet":  # load onet model
     ONet = Detector(O_Net, 48, batch_size[2], model_path[2])
     detectors[2] = ONet
 
@@ -61,7 +59,7 @@ for imagepath in gt_imdb:
     for bbox in all_boxes[count]:
         # cv2.putText(image,str(np.round(bbox[4],2)),(int(bbox[0]),int(bbox[1])),cv2.FONT_HERSHEY_TRIPLEX,1,color=(255,0,255))
         # cv2.rectangle(image, (int(bbox[0]),int(bbox[1])),(int(bbox[2]),int(bbox[3])),(0,0,255), 3)
-        cv2.rectangle(image, (max(int(bbox[0]-5), 0), max(int(bbox[1]-5), 0)),
+        cv2.rectangle(image, (max(int(bbox[0]-5), 0), max(int(bbox[1]-5), 0)),  # 绘制矩形
                       (min(int(bbox[2]+5), sp[1]), min((int(bbox[3]+5)), sp[0])), (0, 0, 255), 3)
 
         # image[max(int(bbox[1]-5), 0):min(int(bbox[3]+5), sp[0]),

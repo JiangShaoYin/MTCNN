@@ -8,8 +8,6 @@ from nms import py_nms
 
 
 class MtcnnDetector(object):
-
-
     def __init__(self, detectors, min_face_size=25,
                  stride=2, threshold=[0.6, 0.7, 0.7],  # 框框偏移比例0.7, 就舍去这个框框
                  scale_factor=0.79,
@@ -93,42 +91,16 @@ class MtcnnDetector(object):
 
         return boundingbox.T
 
-
-
-    #pre-process images
-    def processed_image(self, img, scale):
+    def processed_image(self, img, scale):   # pre-process images
         height, width, channels = img.shape
-        new_height = int(height * scale)  # resized new height
-        new_width = int(width * scale)  # resized new width
+        new_height = int(height * scale)   # resized new height
+        new_width = int(width * scale)   # resized new width
         new_dim = (new_width, new_height)
         img_resized = cv2.resize(img, new_dim, interpolation=cv2.INTER_LINEAR)  # resized image
         img_resized = (img_resized - 127.5) / 128  # pixel数值做归1化处理
         return img_resized
 
-    def pad(self, bboxes, w, h):
-        """
-            pad the the bboxes, alse restrict the size of it
-        Parameters:
-        ----------
-            bboxes: numpy array, n x 5
-                input bboxes
-            w: float number
-                width of the input image
-            h: float number
-                height of the input image
-        Returns :
-        ------
-            dy, dx : numpy array, n x 1
-                start point of the bbox in target image
-            edy, edx : numpy array, n x 1
-                end point of the bbox in target image
-            y, x : numpy array, n x 1
-                start point of the bbox in original image
-            ex, ex : numpy array, n x 1
-                end point of the bbox in original image
-            tmph, tmpw: numpy array, n x 1
-                height and width of the bbox
-        """
+    def pad(self, bboxes, w, h):  #
         tmpw, tmph = bboxes[:, 2] - bboxes[:, 0] + 1, bboxes[:, 3] - bboxes[:, 1] + 1
         num_box = bboxes.shape[0]
 
@@ -158,7 +130,7 @@ class MtcnnDetector(object):
 
         return return_list
     
-    def detect_pnet(self, im):  # 计算1张图
+    def detect_pnet(self, im):  # 用pnet计算1张图的detection
         net_size = 12
         current_scale = float(net_size) / self.min_face_size  # find initial scale
         im_resized = self.processed_image(im, current_scale)   # 将img按照scale缩放，并将pixel做归1化处理
@@ -166,37 +138,36 @@ class MtcnnDetector(object):
 
         all_boxes = list()
 
-        while min(current_height, current_width) > net_size: # 将输入图不停的做0.79的缩放，直到最小尺寸 > 12
+        while min(current_height, current_width) > net_size: # 将输入图不停的做0.79^i的缩放，直到最小尺寸 > 12
             cls_cls_map, bbox = self.pnet_detector.predict(im_resized)  # 用P_Net计算输入图片的cls和box结果
 
-            boxes = self.generate_bbox(cls_cls_map[:, :,1], bbox, current_scale, self.thresh[0])  # 取1维， 即衡量one-hot编码是否接近真(0,1)的那一维参数。cls_cls_map的shape是341*251*2， reg的shape是341*251*2
-                                                                                                 # boundingbox前4列是每个box的索引 + 偏移？第5列是人脸预测可能性，后4列是可能的坐标
-            current_scale *= self.scale_factor  # 缩放因子，0.79^i
-            im_resized = self.processed_image(im, current_scale)  # 将image(1385, 1024, 3)，按照0.79^i的比例缩放
-            current_height, current_width, _ = im_resized.shape  # 将输入图不停的做0.79的缩放
-
+            boxes = self.generate_bbox(cls_cls_map[:, :,1], bbox, current_scale, self.thresh[0])  # 取1维， 即衡量one-hot编码是否接近真(0,1)的那一维参数。cls_cls_map的shape是341*251*2， reg的shape是341*251*2，
+                                                                                                  # 根据预测bbox的offset，将预测的人脸框坐标提取出来。
             if boxes.size == 0:
                 continue                                # boxes（781 * 9）
             keep = py_nms(boxes[:, :5], 0.5, 'Union')   # 抽0维全部（781多行），1维前5列元素  0.5是与当前候选框重叠率之间的threshold，如果小于这个值，认为是另一个物体的分类框。
                                                         # 选取概率最大的crop，舍去与最大概率重叠率高的crop，筛选出来239个框框
-            boxes = boxes[keep]  # keep为框框在781 * 9 里面的索引
-            all_boxes.append(boxes)  # 将1种尺寸的图片候选框集框加入集合，all_boxes[i], 循环16轮，但是第10轮以后，就没有新的box产生了。
+            boxes = boxes[keep]                         # keep为框框在781 * 9 里面的索引
+            all_boxes.append(boxes)                     # 将1种尺寸的图片候选框集框加入集合，all_boxes[i], 循环16轮，但是第10轮以后，就没有新的box产生了， boundingbox前4列是每个box的crop框框， 第5列是人脸预测可能性，后4列是预测的offset
+
+            # 缩放单元
+            current_scale *= self.scale_factor  # 缩放因子，0.79^i
+            im_resized = self.processed_image(im, current_scale)  # 将image(1385, 1024, 3)，按照0.79^i的比例缩放
+            current_height, current_width, _ = im_resized.shape  # 将输入图不停的做0.79的缩放
 
         if len(all_boxes) == 0:
             return None, None, None
 
         all_boxes = np.vstack(all_boxes)  # 收集所有的869个框框
 
-        # merge the detection from first stage
-        keep = py_nms(all_boxes[:, 0:5], 0.7, 'Union')  # 对这869个框框再进行nms筛选
+        keep = py_nms(all_boxes[:, 0:5], 0.7, 'Union')  # 对这869个框框再进行nms筛选，对第1个阶段的框框进行merge
         all_boxes = all_boxes[keep]
         boxes = all_boxes[:, :5]  # 取box的前5维数据，这是截图框框的坐标
 
         bbw = all_boxes[:, 2] - all_boxes[:, 0] + 1  # 找到框框的宽
         bbh = all_boxes[:, 3] - all_boxes[:, 1] + 1  # 找到框框的高
 
-        # refine the boxes
-        boxes_c = np.vstack([all_boxes[:, 0] + all_boxes[:, 5] * bbw,  # boxes_c存放calibrate后，预测的detection区域
+        boxes_c = np.vstack([all_boxes[:, 0] + all_boxes[:, 5] * bbw,  # refine the boxes，boxes_c存放calibrate后，预测的detection区域
                              all_boxes[:, 1] + all_boxes[:, 6] * bbh,
                              all_boxes[:, 2] + all_boxes[:, 7] * bbw,
                              all_boxes[:, 3] + all_boxes[:, 8] * bbh,
@@ -205,23 +176,7 @@ class MtcnnDetector(object):
 
         return boxes, boxes_c, None
 
-    def detect_rnet(self, im, dets):
-        """Get face candidates using rnet
-
-        Parameters:
-        ----------
-        im: numpy array
-            input image array
-        dets: numpy array
-            detection results of pnet
-
-        Returns:
-        -------
-        boxes: numpy array
-            detected boxes before calibration
-        boxes_c: numpy array
-            boxes after calibration
-        """
+    def detect_rnet(self, im, dets):  # dets为上一层网络传入的detections
         h, w, c = im.shape
         dets = self.convert_to_square(dets)
         dets[:, 0:4] = np.round(dets[:, 0:4])
@@ -233,42 +188,22 @@ class MtcnnDetector(object):
             tmp = np.zeros((tmph[i], tmpw[i], 3), dtype=np.uint8)
             tmp[dy[i]:edy[i] + 1, dx[i]:edx[i] + 1, :] = im[y[i]:ey[i] + 1, x[i]:ex[i] + 1, :]
             cropped_ims[i, :, :, :] = (cv2.resize(tmp, (24, 24))-127.5) / 128
-        #cls_scores : num_data*2
-        #reg: num_data*4
-        #landmark: num_data*10
-        cls_scores, reg, _ = self.rnet_detector.predict(cropped_ims)
+
+        cls_scores, reg, _ = self.rnet_detector.predict(cropped_ims)  # 用R_net预测
         cls_scores = cls_scores[:,1]
         keep_inds = np.where(cls_scores > self.thresh[1])[0]
         if len(keep_inds) > 0:
             boxes = dets[keep_inds]
             boxes[:, 4] = cls_scores[keep_inds]
             reg = reg[keep_inds]
-            #landmark = landmark[keep_inds]
         else:
             return None, None, None
-        
-        
         keep = py_nms(boxes, 0.6)
         boxes = boxes[keep]
         boxes_c = self.calibrate_box(boxes, reg[keep])
         return boxes, boxes_c,None
+
     def detect_onet(self, im, dets):
-        """Get face candidates using onet
-
-        Parameters:
-        ----------
-        im: numpy array
-            input image array
-        dets: numpy array
-            detection results of rnet
-
-        Returns:
-        -------
-        boxes: numpy array
-            detected boxes before calibration
-        boxes_c: numpy array
-            boxes after calibration
-        """
         h, w, c = im.shape
         dets = self.convert_to_square(dets)
         dets[:, 0:4] = np.round(dets[:, 0:4])
@@ -285,23 +220,19 @@ class MtcnnDetector(object):
         cls_scores = cls_scores[:,1]        
         keep_inds = np.where(cls_scores > self.thresh[2])[0]        
         if len(keep_inds) > 0:
-            #pickout filtered box
-            boxes = dets[keep_inds]
+            boxes = dets[keep_inds]    #pickout filtered box
             boxes[:, 4] = cls_scores[keep_inds]
             reg = reg[keep_inds]
             landmark = landmark[keep_inds]
         else:
             return None, None, None
-        
-        #width
-        w = boxes[:,2] - boxes[:,0] + 1
-        #height
-        h = boxes[:,3] - boxes[:,1] + 1
+
+        w = boxes[:,2] - boxes[:,0] + 1   #width
+        h = boxes[:,3] - boxes[:,1] + 1   #height
         landmark[:,0::2] = (np.tile(w,(5,1)) * landmark[:,0::2].T + np.tile(boxes[:,0],(5,1)) - 1).T
         landmark[:,1::2] = (np.tile(h,(5,1)) * landmark[:,1::2].T + np.tile(boxes[:,1],(5,1)) - 1).T        
         boxes_c = self.calibrate_box(boxes, reg)
-        
-        
+
         boxes = boxes[py_nms(boxes, 0.6, "Minimum")]
         keep = py_nms(boxes_c, 0.6, "Minimum")
         boxes_c = boxes_c[keep]
@@ -343,42 +274,36 @@ class MtcnnDetector(object):
             t3 = time.time() - t
             t = time.time()
             print(
-                "time cost " + '{:.3f}'.format(t1 + t2 + t3) + '  pnet {:.3f}  rnet {:.3f}  onet {:.3f}'.format(t1, t2,
-                                                                                                                t3))
-        return boxes_c,landmark
+                "time cost " + '{:.3f}'.format(t1 + t2 + t3) + '  pnet {:.3f}  rnet {:.3f}  onet {:.3f}'.format(t1, t2, t3))
+        return boxes_c, landmark
 
-    def detect_face(self, test_data):
-        all_boxes = []#save each image's bboxes
+    def detect_face(self, test_data):  # 用3层网络检测数据
+        all_boxes = []  # save each image's bboxes
         landmarks = []
         batch_idx = 0
         sum_time = 0
-        #test_data is iter_
         for databatch in test_data:  # databatch(image returned), 从test_data对象中拿出一个batch（此时batch.size == 1）的测试pic
             if batch_idx % 1 == 0:
                 print("%d images done" % batch_idx)
             im = databatch  # databatch里面存储1个img的像素信息
-            # pnet
-            t1 = 0
+
+            t1 = 0  # pnet
             if self.pnet_detector:
                 t = time.time()
-                #ignore landmark  # boxes，
                 boxes, boxes_c, landmark = self.detect_pnet(im)  # boxes是原始的截图框， boxes_c是calibrate offset后的框框
                 t1 = time.time() - t
                 sum_time += t1
-                if boxes_c is None:
+                if boxes_c is None:  #  第1次进循环，创建空的数组
                     print("boxes_c is None...")
                     all_boxes.append(np.array([]))
-
                     landmarks.append(np.array([]))     # pay attention
                     batch_idx += 1
                     continue
 
-            # rnet
-            t2 = 0
-            if self.rnet_detector:
+            t2 = 0   # rnet
+            if self.rnet_detector:  # 第一张图片预测的detections传入下一层网络。
                 t = time.time()
-                #ignore landmark                 
-                boxes, boxes_c, landmark = self.detect_rnet(im, boxes_c)
+                boxes, boxes_c, landmark = self.detect_rnet(im, boxes_c)  # 用P_net计算boxes, boxes_c，和landmark
                 t2 = time.time() - t
                 sum_time += t2
                 if boxes_c is None:
@@ -386,11 +311,11 @@ class MtcnnDetector(object):
                     landmarks.append(np.array([]))
                     batch_idx += 1
                     continue
-            # onet
-            t3 = 0
+
+            t3 = 0   # onet
             if self.onet_detector:
                 t = time.time()
-                boxes, boxes_c, landmark = self.detect_onet(im, boxes_c)
+                boxes, boxes_c, landmark = self.detect_onet(im, boxes_c)  # 用R_net计算boxes, boxes_c，和landmark
                 t3 = time.time() - t
                 sum_time += t3
                 if boxes_c is None:

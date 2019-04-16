@@ -126,17 +126,14 @@ def t_net(prefix, epoch,  batch_size, test_mode="PNet",  thresh=[0.6, 0.6, 0.7],
         ONet = Detector(O_Net, 48, batch_size[2], model_path[2])
         detectors[2] = ONet
         
-    basedir = '.'    
-    #anno_file
+    basedir = '.'
     filename = './wider_face_train_bbx_gt.txt'  # 获取检测框的ground truth值
-    #read annatation(type:dict)
     data = read_annotation(basedir, filename)  # 读pic的文件名，和box的ground truth值，data['images']==all image pathes
                                                                                     #  data['bboxes'] =all image bboxes
     mtcnn_detector = MtcnnDetector(detectors=detectors, min_face_size=min_face_size, stride=stride, threshold=thresh, slide_window=slide_window)
     print("==================================")
-    # 注意是在“test”模式下，  imdb = IMDB("wider", image_set, root_path, dataset_path, 'test')，  gt_imdb = imdb.gt_imdb()
-    test_data = TestLoader(data['images'])  # 生成输入图片的管理对象test_data
-    #list
+
+    test_data = TestLoader(data['images'])  # 生成输入图片的管理对象test_data， # 注意是在“test”模式下，  imdb = IMDB("wider", image_set, root_path, dataset_path, 'test')，  gt_imdb = imdb.gt_imdb()
     detections, _ = mtcnn_detector.detect_face(test_data)  # 从test_data输入人脸pixel,返回detection和cls
 
     save_net = 'RNet'
