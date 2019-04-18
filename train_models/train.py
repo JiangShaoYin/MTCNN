@@ -117,9 +117,9 @@ def train(net_factory, prefix, end_epoch, base_dir, display=200, base_lr=0.01):
         os.mkdir(logs_dir)                     # logs文件夹的
 
     writer = tf.summary.FileWriter(logs_dir,sess.graph)
-    #begin 
+    # begin
     coord = tf.train.Coordinator()
-    #begin enqueue thread 启动多个工作线程同时将多个tensor（训练数据）推送入文件名称队列中
+    # begin enqueue thread 启动多个工作线程同时将多个tensor（训练数据）推送入文件名称队列中
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
     i = 0
     #total steps

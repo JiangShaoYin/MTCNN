@@ -8,25 +8,25 @@ def py_nms(dets, thresh, mode="Union"):
     :param thresh: retain overlap <= thresh
     :return: indexes to keep
     """
-    x1 = dets[:, 0]
+    x1 = dets[:, 0]  # 所有bbox的x1坐标
     y1 = dets[:, 1]
     x2 = dets[:, 2]
     y2 = dets[:, 3]
     scores = dets[:, 4]
 
-    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-    order = scores.argsort()[::-1]
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)  #
+    order = scores.argsort()[::-1]  # 将bbox圈到人的bbox可能性排序，取出对应的bbox的索引值，order[0]=761，scores[761]==0.999
 
     keep = []
     while order.size > 0:
         i = order[0]
-        keep.append(i)
-        xx1 = np.maximum(x1[i], x1[order[1:]])
+        keep.append(i)  # 将第1个bbox加入要保留的list
+        xx1 = np.maximum(x1[i], x1[order[1:]])  # 除了第1bbox个x1坐标外，剩下所有bbox中取
         yy1 = np.maximum(y1[i], y1[order[1:]])
         xx2 = np.minimum(x2[i], x2[order[1:]])
         yy2 = np.minimum(y2[i], y2[order[1:]])
 
-        w = np.maximum(0.0, xx2 - xx1 + 1)
+        w = np.maximum(0.0, xx2 - xx1 + 1)  # 重叠区域的宽高
         h = np.maximum(0.0, yy2 - yy1 + 1)
         inter = w * h
         if mode == "Union":

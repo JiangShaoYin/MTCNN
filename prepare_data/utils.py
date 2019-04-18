@@ -2,14 +2,12 @@ import numpy as np
 
 def IoU(box, boxes):
     """Compute IoU between detect box and gt boxes
-
     Parameters:
     ----------
     box: numpy array , shape (5, ): x1, y1, x2, y2, score
         input box
     boxes: numpy array, shape (n, 4): x1, y1, x2, y2
         input ground truth boxes
-
     Returns:
     -------
     ovr: numpy.array, shape (n, )

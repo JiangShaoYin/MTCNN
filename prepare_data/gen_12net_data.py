@@ -40,7 +40,7 @@ for annotation in annotations:
 
     bbox = map(float, annotation[1:])     # 从pic名后面取出bbox信息
     #gt
-    boxes = np.array(list(bbox), dtype=np.float32).reshape(-1, 4)
+    boxes = np.array(list(bbox), dtype=np.float32).reshape(-1, 4)   # boxes是n * 4维的
     #load image
     img = cv2.imread(os.path.join(im_dir, im_path + '.jpg'))  # 'WIDER_train/images       0--Parade/0_Parade_marchingband_1_849                   .jpg'
     idx += 1  # 记录已读图片的张数
@@ -60,8 +60,8 @@ for annotation in annotations:
         ny = npr.randint(0, height - size)
         #random crop
         crop_box = np.array([nx, ny, nx + size, ny + size])
-        #cal iou  ,intersection-over-union
-        Iou = IoU(crop_box, boxes)  # boxex中存储label中标注好的人脸矩形框坐标
+
+        Iou = IoU(crop_box, boxes)  # boxex中存储label中标注好的人脸矩形框坐标，返回crop_box与众多label的boxes中，iou最大的值
         
         cropped_im = img[ny : ny + size, nx : nx + size, :]  # 剪裁图像的三维尺寸 ，矩形框的最后一行表示rgb的3个通道全采集
         resized_im = cv2.resize(cropped_im, (12, 12), interpolation=cv2.INTER_LINEAR)  # 把图片保存成12 * 12 大小的
