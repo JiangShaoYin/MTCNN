@@ -37,8 +37,8 @@ for annotation in annotations:
     annotation = annotation.strip().split(' ')  # strip()
     #image path
     im_path = annotation[0]
-    #boxed change to float type
-    bbox = map(float, annotation[1:])
+
+    bbox = map(float, annotation[1:])     # 从pic名后面取出bbox信息
     #gt
     boxes = np.array(list(bbox), dtype=np.float32).reshape(-1, 4)
     #load image
