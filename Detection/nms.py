@@ -15,13 +15,13 @@ def py_nms(dets, thresh, mode="Union"):
     scores = dets[:, 4]
 
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)  #
-    order = scores.argsort()[::-1]  # 将bbox圈到人的bbox可能性排序，取出对应的bbox的索引值，order[0]=761，scores[761]==0.999
+    order = scores.argsort()[::-1]  # 将bbox圈到人的bbox可能性排序，取出对应的bbox的索引值，第一轮迭代order有全部784个元素，order[0]=761，scores[761]==0.999
 
     keep = []
     while order.size > 0:
         i = order[0]
         keep.append(i)  # 将第1个bbox加入要保留的list
-        xx1 = np.maximum(x1[i], x1[order[1:]])  # 除了第1bbox个x1坐标外，剩下所有bbox中取
+        xx1 = np.maximum(x1[i], x1[order[1:]])  # 求score最高的bbox和其余所有bbox的重叠区域
         yy1 = np.maximum(y1[i], y1[order[1:]])
         xx2 = np.minimum(x2[i], x2[order[1:]])
         yy2 = np.minimum(y2[i], y2[order[1:]])
@@ -30,11 +30,11 @@ def py_nms(dets, thresh, mode="Union"):
         h = np.maximum(0.0, yy2 - yy1 + 1)
         inter = w * h
         if mode == "Union":
-            ovr = inter / (areas[i] + areas[order[1:]] - inter)
+            ovr = inter / (areas[i] + areas[order[1:]] - inter)  # 计算
         elif mode == "Minimum":
             ovr = inter / np.minimum(areas[i], areas[order[1:]])
         #keep
-        inds = np.where(ovr <= thresh)[0]
-        order = order[inds + 1]
+        inds = np.where(ovr <= thresh)[0]  # 取出0维，即IOU小于threshold的bbox的索引
+        order = order[inds + 1]  # 把与order[0]对应bbox重叠度小于thresh的bbox索引号，放入新的order，
 
     return keep
