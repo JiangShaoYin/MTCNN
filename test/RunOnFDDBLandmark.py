@@ -29,7 +29,7 @@ def get_imdb_fddb(data_dir):
 
 if __name__ == "__main__":
     test_mode = "ONet"
-    thresh = [0.6,0.15,0.05]
+    thresh = [0.6, 0.15, 0.05]
     min_face_size = 24
     stride = 2
     slide_window = False
@@ -37,7 +37,6 @@ if __name__ == "__main__":
     vis = False
     detectors = [None, None, None]
     prefix = ['../data/MTCNN_model/PNet_landmark/PNet', '../data/MTCNN_model/RNet_landmark/RNet', '../data/MTCNN_model/ONet_landmark/ONet']
-    # epoch = [18, 14, 16]
     epoch = [16, 6, 22]
     batch_size = [2048, 256, 16]
     model_path = ['%s-%s' % (x, y) for x, y in zip(prefix, epoch)]

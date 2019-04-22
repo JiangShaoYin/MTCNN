@@ -137,8 +137,10 @@ class MtcnnDetector(object):
         current_height, current_width, _ = im_resized.shape
 
         all_boxes = list()
-
+        cnt = 0
         while min(current_height, current_width) > net_size: # 将输入图不停的做0.79^i的缩放，直到最小尺寸 > 12
+            cnt += 1
+            print(cnt)
             cls_cls_map, bbox = self.pnet_detector.predict(im_resized)  # 用P_Net计算输入图片的cls和box结果
             boxes = self.generate_bbox(cls_cls_map[:, :,1], bbox, current_scale, self.thresh[0])  # 将 > thresh对应的位置的预测detection框框计算后， 提取出来，cls_cls_map的shape是341*251*2， reg的shape是341*251*2，
                                                                                                   # 根据预测bbox的offset，将预测的人脸框坐标提取出来。
@@ -188,7 +190,7 @@ class MtcnnDetector(object):
 
         cls_scores, reg, _ = self.rnet_detector.predict(cropped_ims)  # 用R_net预测cls，和detection
         cls_scores = cls_scores[:,1]
-        keep_inds = np.where(cls_scores > self.thresh[1])[0]  # 喂入的18个图片是人脸区域的可能性 > thresh[1]的索引号取出来
+        keep_inds = np.where(cls_scores > self.thresh[1])[0]  # 喂入的18个图片是人脸区域的可能性 > thresh[1] == 0.6的索引号取出来
         if len(keep_inds) > 0:
             boxes = dets[keep_inds]  # 上一层网络的预测区域
             boxes[:, 4] = cls_scores[keep_inds]
@@ -215,7 +217,7 @@ class MtcnnDetector(object):
         cls_scores, reg, landmark = self.onet_detector.predict(cropped_ims)  # 计算cls， dec ，和landmark
         #prob belongs to face
         cls_scores = cls_scores[:,1]        
-        keep_inds = np.where(cls_scores > self.thresh[2])[0]        
+        keep_inds = np.where(cls_scores > self.thresh[2])[0]        # 0.7
         if len(keep_inds) > 0:
             boxes = dets[keep_inds]    #pickout filtered box
             boxes[:, 4] = cls_scores[keep_inds]
